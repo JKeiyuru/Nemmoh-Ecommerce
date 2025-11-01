@@ -1,11 +1,13 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/prop-types */
 // client/src/components/shopping-view/product-tile.jsx
 import { Card, CardContent, CardFooter } from "../ui/card";
 import { Button } from "../ui/button";
 import { categoryOptionsMap } from "@/config";
 import { Badge } from "../ui/badge";
-import { Heart, HeartOff } from "lucide-react";
+import { Heart } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import {
   addToWishlist,
   removeFromWishlist,
@@ -19,8 +21,9 @@ function ShoppingProductTile({
   handleAddtoCart,
 }) {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
 
   const wishlistState = useSelector((state) => state.shopWishlist);
   const wishlistItems = wishlistState?.items || [];
@@ -28,13 +31,15 @@ function ShoppingProductTile({
   const isWishlisted = wishlistItems.some((item) => item._id === product._id);
 
   const toggleWishlist = async (e) => {
-    e.stopPropagation(); // Prevent triggering product details modal
+    e.stopPropagation();
 
-    if (!user) {
+    if (!isAuthenticated || !user) {
       toast({
         title: "Please login to use wishlist.",
-        variant: "destructive",
+        description: "You'll be redirected to the login page.",
+        variant: "default",
       });
+      setTimeout(() => navigate("/auth/login"), 1500);
       return;
     }
 
@@ -51,7 +56,6 @@ function ShoppingProductTile({
         });
       }
 
-      // ✅ Refresh wishlist after update
       dispatch(fetchWishlist(user.id));
     } catch (err) {
       toast({
@@ -59,6 +63,20 @@ function ShoppingProductTile({
         variant: "destructive",
       });
     }
+  };
+
+  const handleAddToCartClick = () => {
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "Please login to add items to cart.",
+        description: "You'll be redirected to the login page.",
+        variant: "default",
+      });
+      setTimeout(() => navigate("/auth/login"), 1500);
+      return;
+    }
+    
+    handleAddtoCart(product?._id, product?.totalStock);
   };
 
   return (
@@ -85,7 +103,7 @@ function ShoppingProductTile({
           <img
             src={product?.image}
             alt={product?.title}
-            className="w-full h-[300px] object-cover rounded-t-lg"
+            className="w-full h-[300px] object-cover rounded-t-lg cursor-pointer"
           />
           {product?.totalStock === 0 ? (
             <Badge className="absolute top-2 left-2 bg-red-500 hover:bg-red-600">
@@ -102,13 +120,12 @@ function ShoppingProductTile({
           ) : null}
         </div>
 
-        <CardContent className="p-4">
+        <CardContent className="p-4 cursor-pointer">
           <h2 className="text-xl font-bold mb-2">{product?.title}</h2>
           <div className="flex justify-between items-center mb-2">
             <span className="text-[16px] text-muted-foreground">
               {categoryOptionsMap[product?.category]}
             </span>
-            
           </div>
           <div className="flex justify-between items-center mb-2">
             <span
@@ -135,7 +152,7 @@ function ShoppingProductTile({
           </Button>
         ) : (
           <Button
-            onClick={() => handleAddtoCart(product?._id, product?.totalStock)}
+            onClick={handleAddToCartClick}
             className="w-full"
           >
             Add to cart

@@ -1,3 +1,4 @@
+/* eslint-disable react/prop-types */
 // client/src/components/common/check-auth.jsx
 import { Navigate, useLocation } from "react-router-dom";
 import { useSelector } from "react-redux";
@@ -6,7 +7,6 @@ function CheckAuth({ children }) {
   const location = useLocation();
   const { isAuthenticated, user, isLoading } = useSelector((state) => state.auth);
   
-  // Debug logs - remove after fixing
   console.log('CheckAuth Debug:', {
     isAuthenticated,
     user,
@@ -27,11 +27,19 @@ function CheckAuth({ children }) {
   const isAuthPage = location.pathname.startsWith("/auth");
   const isAdminPage = location.pathname.startsWith("/admin");
   const isShopPage = location.pathname.startsWith("/shop");
+  
+  // Protected routes that require authentication
+  const protectedShopRoutes = ['/shop/checkout', '/shop/account'];
+  const isProtectedShopRoute = protectedShopRoutes.some(route => 
+    location.pathname.startsWith(route)
+  );
 
   // Root path redirect
   if (location.pathname === "/") {
+    if (!isAuthenticated) {
+      return <Navigate to="/shop/home" replace />;
+    }
     return <Navigate to={
-      !isAuthenticated ? "/auth/login" : 
       user?.role === "admin" ? "/admin/dashboard" : "/shop/home"
     } replace />;
   }
@@ -45,7 +53,7 @@ function CheckAuth({ children }) {
 
   // Protect admin routes
   if (isAuthenticated && user?.role !== "admin" && isAdminPage) {
-    return <Navigate to="/unauthorized" replace />;
+    return <Navigate to="/unauth-page" replace />;
   }
 
   // Redirect admin from shop to dashboard
@@ -53,8 +61,13 @@ function CheckAuth({ children }) {
     return <Navigate to="/admin/dashboard" replace />;
   }
 
-  // Protect all routes when not authenticated
-  if (!isAuthenticated && !isAuthPage) {
+  // Only protect specific shop routes (checkout, account)
+  if (!isAuthenticated && isProtectedShopRoute) {
+    return <Navigate to="/auth/login" state={{ from: location }} replace />;
+  }
+
+  // Protect all admin routes when not authenticated
+  if (!isAuthenticated && isAdminPage) {
     return <Navigate to="/auth/login" state={{ from: location }} replace />;
   }
 

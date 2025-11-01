@@ -19,13 +19,13 @@ import CheckAuth from "./components/common/check-auth";
 import UnauthPage from "./pages/unauth-page";
 import { useDispatch, useSelector } from "react-redux";
 import { useEffect, useState } from "react";
-import { checkAuth, setFirebaseUser, clearAuth, syncFirebaseAuth } from "./store/auth-slice";
+import { checkAuth, setFirebaseUser, clearAuth, syncFirebaseAuth, setLoading } from "./store/auth-slice";
 import PaypalReturnPage from "./pages/shopping-view/paypal-return";
 import PaymentSuccessPage from "./pages/shopping-view/payment-success";
 import SearchProducts from "./pages/shopping-view/search";
 import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
-import SpectacularLoader from  "./components/common/spectacular-loader"
+import SpectacularLoader from "./components/common/spectacular-loader";
 
 function App() {
   const { user, isAuthenticated, isLoading } = useSelector(
@@ -33,11 +33,22 @@ function App() {
   );
   const dispatch = useDispatch();
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
+  const [initialLoadComplete, setInitialLoadComplete] = useState(false);
 
   useEffect(() => {
     let mounted = true;
 
     console.log('🚀 App: Setting up Firebase auth listener...');
+
+    // Set a timeout to prevent indefinite loading
+    const loadingTimeout = setTimeout(() => {
+      if (!initialLoadComplete && mounted) {
+        console.log('⏱️ Loading timeout reached, proceeding without auth');
+        setFirebaseInitialized(true);
+        setInitialLoadComplete(true);
+        dispatch(setLoading(false));
+      }
+    }, 3000); // 3 second timeout
 
     // Firebase Auth State Listener
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
@@ -78,6 +89,8 @@ function App() {
       } finally {
         if (mounted) {
           setFirebaseInitialized(true);
+          setInitialLoadComplete(true);
+          clearTimeout(loadingTimeout);
         }
       }
     });
@@ -86,14 +99,15 @@ function App() {
     return () => {
       console.log('🧹 App: Cleaning up Firebase auth listener...');
       mounted = false;
+      clearTimeout(loadingTimeout);
       unsubscribe();
     };
   }, [dispatch]);
 
-  // Show loading until Firebase is initialized
-  if (!firebaseInitialized || isLoading) {
-    console.log('⏳ App: Showing loader...', { firebaseInitialized, isLoading });
-    return <SpectacularLoader/>;
+  // Only show loading on initial load, not on subsequent auth checks
+  if (!initialLoadComplete) {
+    console.log('⏳ App: Initial loading...', { firebaseInitialized, isLoading });
+    return <SpectacularLoader />;
   }
 
   console.log('🎯 App render - Auth State:', { 

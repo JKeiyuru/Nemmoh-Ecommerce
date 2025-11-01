@@ -1,8 +1,9 @@
+/* eslint-disable react/no-unescaped-entities */
 /* eslint-disable no-unused-vars */
 /* eslint-disable react/jsx-key */
+// client/src/pages/shopping-view/home.jsx
 import { Button } from "@/components/ui/button";
 import bannerOne from "../../assets/banner-1.webp";
-//bannerTwo;
 import bannerThree from "../../assets/banner-3.webp";
 import {
   HomeIcon,
@@ -54,7 +55,7 @@ function ShoppingHome() {
   );
   const { featureImageList } = useSelector((state) => state.commonFeature);
   const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -74,6 +75,16 @@ function ShoppingHome() {
   }
 
   function handleAddtoCart(getCurrentProductId) {
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "Please login to add items to cart.",
+        description: "You'll be redirected to the login page.",
+        variant: "default",
+      });
+      setTimeout(() => navigate("/auth/login"), 1500);
+      return;
+    }
+
     dispatch(
       addToCart({
         userId: user?.id,
@@ -113,10 +124,10 @@ function ShoppingHome() {
   }, [dispatch]);
 
   useEffect(() => {
-    if (user?.id) {
+    if (isAuthenticated && user?.id) {
       dispatch(fetchWishlist(user.id));
     }
-  }, [dispatch, user]);
+  }, [dispatch, isAuthenticated, user?.id]);
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -126,7 +137,9 @@ function ShoppingHome() {
             <img
               src={slide?.image}
               key={index}
-              className={`$${index === currentSlide ? "opacity-100" : "opacity-0"} absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-1000`}
+              className={`${
+                index === currentSlide ? "opacity-100" : "opacity-0"
+              } absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-1000`}
             />
           ))}
         <Button

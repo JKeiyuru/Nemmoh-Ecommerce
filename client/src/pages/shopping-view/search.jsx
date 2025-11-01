@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 import ProductDetailsDialog from "@/components/shopping-view/product-details";
 import ShoppingProductTile from "@/components/shopping-view/product-tile";
 import { Input } from "@/components/ui/input";
@@ -10,20 +11,20 @@ import {
 } from "@/store/shop/search-slice";
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 
 function SearchProducts() {
   const [keyword, setKeyword] = useState("");
   const [openDetailsDialog, setOpenDetailsDialog] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const { searchResults } = useSelector((state) => state.shopSearch);
   const { productDetails } = useSelector((state) => state.shopProducts);
-
-  const { user } = useSelector((state) => state.auth);
-
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
   const { cartItems } = useSelector((state) => state.shopCart);
   const { toast } = useToast();
+
   useEffect(() => {
     if (keyword && keyword.trim() !== "" && keyword.trim().length > 3) {
       setTimeout(() => {
@@ -37,6 +38,16 @@ function SearchProducts() {
   }, [keyword]);
 
   function handleAddtoCart(getCurrentProductId, getTotalStock) {
+    if (!isAuthenticated || !user) {
+      toast({
+        title: "Please login to add items to cart.",
+        description: "You'll be redirected to the login page.",
+        variant: "default",
+      });
+      setTimeout(() => navigate("/auth/login"), 1500);
+      return;
+    }
+
     console.log(cartItems);
     let getCartItems = cartItems.items || [];
 
@@ -51,7 +62,6 @@ function SearchProducts() {
             title: `Only ${getQuantity} quantity can be added for this item`,
             variant: "destructive",
           });
-
           return;
         }
       }
@@ -103,6 +113,7 @@ function SearchProducts() {
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5">
         {searchResults.map((item) => (
           <ShoppingProductTile
+            key={item._id}
             handleAddtoCart={handleAddtoCart}
             product={item}
             handleGetProductDetails={handleGetProductDetails}

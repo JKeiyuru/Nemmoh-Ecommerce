@@ -1,4 +1,5 @@
 /* eslint-disable no-unused-vars */
+// client/src/components/shopping-view/header.jsx
 import { HousePlug, LogOut, Menu, ShoppingCart, UserCog, Heart, HeartOff, Phone, MapPin, Clock, Truck, ChevronDown, ChevronUp } from "lucide-react";
 import logo from "../../assets/Tempara1.5.jpg";
 import {
@@ -26,6 +27,7 @@ import { useEffect, useState } from "react";
 import { fetchCartItems } from "@/store/shop/cart-slice";
 import { Label } from "../ui/label";
 import WishlistSheet from "./wishlist-sheet";
+import { useToast } from "../ui/use-toast";
 
 function MenuItems() {
   const navigate = useNavigate();
@@ -70,86 +72,136 @@ function MenuItems() {
 }
 
 function HeaderRightContent() {
-  const { user } = useSelector((state) => state.auth);
+  const { user, isAuthenticated } = useSelector((state) => state.auth);
   const { cartItems } = useSelector((state) => state.shopCart);
   const wishlistItems = useSelector((state) => state.shopWishlist.items || []);
   const [openCartSheet, setOpenCartSheet] = useState(false);
   const [openWishlistSheet, setOpenWishlistSheet] = useState(false);
   const navigate = useNavigate();
   const dispatch = useDispatch();
+  const { toast } = useToast();
 
   function handleLogout() {
-    dispatch(logoutUser());
+    dispatch(logoutUser()).then(() => {
+      toast({
+        title: "Logged out successfully",
+      });
+      navigate("/shop/home");
+    });
   }
 
   useEffect(() => {
-    dispatch(fetchCartItems(user?.id));
-  }, [dispatch]);
+    if (isAuthenticated && user?.id) {
+      dispatch(fetchCartItems(user.id));
+    }
+  }, [dispatch, isAuthenticated, user?.id]);
+
+  const handleCartClick = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Please login to view cart",
+        description: "You'll be redirected to the login page.",
+      });
+      setTimeout(() => navigate("/auth/login"), 1500);
+      return;
+    }
+    setOpenCartSheet(true);
+  };
+
+  const handleWishlistClick = () => {
+    if (!isAuthenticated) {
+      toast({
+        title: "Please login to view wishlist",
+        description: "You'll be redirected to the login page.",
+      });
+      setTimeout(() => navigate("/auth/login"), 1500);
+      return;
+    }
+    setOpenWishlistSheet(true);
+  };
 
   return (
     <div className="flex lg:items-center lg:flex-row flex-col gap-4">
       {/* Cart */}
       <Sheet open={openCartSheet} onOpenChange={() => setOpenCartSheet(false)}>
         <Button
-          onClick={() => setOpenCartSheet(true)}
+          onClick={handleCartClick}
           variant="outline"
           size="icon"
           className="relative"
         >
           <ShoppingCart className="w-6 h-6" />
-          <span className="absolute top-[-5px] right-[2px] font-bold text-sm">
-            {cartItems?.items?.length || 0}
-          </span>
+          {isAuthenticated && (
+            <span className="absolute top-[-5px] right-[2px] font-bold text-sm">
+              {cartItems?.items?.length || 0}
+            </span>
+          )}
           <span className="sr-only">User cart</span>
         </Button>
-        <UserCartWrapper
-          setOpenCartSheet={setOpenCartSheet}
-          cartItems={
-            cartItems?.items?.length > 0 ? cartItems.items : []
-          }
-        />
+        {isAuthenticated && (
+          <UserCartWrapper
+            setOpenCartSheet={setOpenCartSheet}
+            cartItems={
+              cartItems?.items?.length > 0 ? cartItems.items : []
+            }
+          />
+        )}
       </Sheet>
 
       {/* Wishlist */}
       <Sheet open={openWishlistSheet} onOpenChange={setOpenWishlistSheet}>
         <Button
-          onClick={() => setOpenWishlistSheet(true)}
+          onClick={handleWishlistClick}
           variant="outline"
           size="icon"
           className="relative"
         >
           <HeartOff className="w-6 h-6 text-red-500" />
-          <span className="absolute top-[-5px] right-[2px] font-bold text-sm">
-            {wishlistItems?.length || 0}
-          </span>
+          {isAuthenticated && (
+            <span className="absolute top-[-5px] right-[2px] font-bold text-sm">
+              {wishlistItems?.length || 0}
+            </span>
+          )}
           <span className="sr-only">User wishlist</span>
         </Button>
-        <WishlistSheet setOpenWishlistSheet={setOpenWishlistSheet} />
+        {isAuthenticated && (
+          <WishlistSheet setOpenWishlistSheet={setOpenWishlistSheet} />
+        )}
       </Sheet>
 
-      {/* Account */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Avatar className="bg-black hover:cursor-pointer">
-            <AvatarFallback className="bg-black text-white font-extrabold">
-              {user?.userName[0].toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent side="right" className="w-56">
-          <DropdownMenuLabel>Logged in as {user?.userName}</DropdownMenuLabel>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => navigate("/shop/account")}>
-            <UserCog className="mr-2 h-4 w-4" />
-            Account
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={handleLogout}>
-            <LogOut className="mr-2 h-4 w-4" />
-            Logout
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      {/* Account or Login Button */}
+      {isAuthenticated && user ? (
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Avatar className="bg-black hover:cursor-pointer">
+              <AvatarFallback className="bg-black text-white font-extrabold">
+                {user?.userName[0].toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent side="right" className="w-56">
+            <DropdownMenuLabel>Logged in as {user?.userName}</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => navigate("/shop/account")}>
+              <UserCog className="mr-2 h-4 w-4" />
+              Account
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : (
+        <Button 
+          onClick={() => navigate("/auth/login")}
+          variant="default"
+          size="sm"
+        >
+          Login
+        </Button>
+      )}
     </div>
   );
 }

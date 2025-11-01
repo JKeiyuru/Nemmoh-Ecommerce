@@ -5,13 +5,12 @@ import { auth } from "@/firebase";
 import { signOut } from "firebase/auth";
 import { API_BASE_URL } from "@/config/config.js";
 
-
 const initialState = {
   isAuthenticated: false,
   isLoading: false,
-  user: null,          // Your custom user data (from MongoDB)
-  firebaseUser: null,  // Firebase auth user data
-  authChecked: false,  // Flag to track if auth has been checked
+  user: null,
+  firebaseUser: null,
+  authChecked: false,
 };
 
 // Register with Firebase + Backend
@@ -78,7 +77,6 @@ export const checkAuth = createAsyncThunk(
         "Content-Type": "application/json",
       };
       
-      // Add Authorization header if Firebase token is provided
       if (firebaseToken) {
         headers.Authorization = `Bearer ${firebaseToken}`;
         console.log('🔑 Added Authorization header with Firebase token');
@@ -97,7 +95,6 @@ export const checkAuth = createAsyncThunk(
       return response.data;
     } catch (error) {
       console.error('❌ CheckAuth error:', error.response?.data || error.message);
-      // Don't treat 401 as a hard error - just means not authenticated
       if (error.response?.status === 401) {
         return rejectWithValue({ success: false, message: 'Not authenticated' });
       }
@@ -106,18 +103,16 @@ export const checkAuth = createAsyncThunk(
   }
 );
 
-// New action to sync Firebase auth with backend
+// Sync Firebase auth with backend
 export const syncFirebaseAuth = createAsyncThunk(
   "auth/syncFirebaseAuth",
   async (firebaseUser, { rejectWithValue, dispatch }) => {
     try {
       console.log('🔄 Syncing Firebase auth for user:', firebaseUser.email);
       
-      // Get fresh ID token
       const idToken = await firebaseUser.getIdToken(true);
       console.log('🎫 Got fresh Firebase token');
       
-      // Try to authenticate with backend using the social-login endpoint
       const response = await axios.post(
         `${API_BASE_URL}/api/auth/social-login`,
         {
@@ -138,13 +133,11 @@ export const syncFirebaseAuth = createAsyncThunk(
       
       console.log('✅ Backend sync successful:', response.data);
       
-      // Now check auth to get the full user data
       const authResult = await dispatch(checkAuth(idToken));
       
       if (authResult.payload?.success) {
         return authResult.payload;
       } else {
-        // If checkAuth failed, but social-login succeeded, return the social-login data
         return response.data;
       }
       
@@ -270,7 +263,6 @@ const authSlice = createSlice({
       .addCase(syncFirebaseAuth.rejected, (state, action) => {
         console.log('❌ Firebase sync rejected:', action.payload);
         state.isLoading = false;
-        // Don't clear auth here - user might still be valid via other means
         state.authChecked = true;
       })
       
