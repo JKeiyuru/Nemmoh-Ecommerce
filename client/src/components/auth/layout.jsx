@@ -8,7 +8,7 @@ function AuthLayout() {
   <div className="hidden lg:flex items-center justify-center w-1/2 px-12 bg-black">
     <div className="max-w-md space-y-6 text-center text-white">
       <h1 className="text-4xl font-extrabold tracking-tight">
-        Welcome to Tempara&apos;s ECommerce Shopping
+        Welcome to Kenya Magic Toy Shop&apos;s ECommerce Shopping
       </h1>
     </div>
   </div>
