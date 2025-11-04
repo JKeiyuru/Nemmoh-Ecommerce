@@ -22,6 +22,8 @@ import {
   Award,
   Shield,
   Heart,
+  TrendingUp,
+  Star,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useEffect, useState } from "react";
@@ -136,11 +138,11 @@ function ShoppingHome() {
   }, [dispatch, isAuthenticated, user?.id]);
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-white via-gray-50/30 to-white">
-      {/* Hero Banner with Elegant Carousel */}
-      <div className="relative w-full h-[500px] md:h-[600px] lg:h-[700px] overflow-hidden">
-        {/* Gradient overlay for sophistication */}
-        <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-white/40 z-10" />
+    <div className="flex flex-col min-h-screen bg-white">
+      {/* Minimal Hero Section - Just enough to intrigue */}
+      <div className="relative w-full h-[300px] md:h-[400px] overflow-hidden">
+        {/* Subtle gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-white z-10" />
         
         {featureImageList && featureImageList.length > 0 &&
           featureImageList.map((slide, index) => (
@@ -158,7 +160,7 @@ function ShoppingHome() {
             </div>
           ))}
         
-        {/* Elegant navigation buttons */}
+        {/* Minimal navigation */}
         <Button
           variant="ghost"
           size="icon"
@@ -169,9 +171,9 @@ function ShoppingHome() {
                 featureImageList.length
             )
           }
-          className="absolute top-1/2 left-4 md:left-8 transform -translate-y-1/2 z-20 glass-effect rounded-full w-12 h-12 hover:bg-white/90 transition-all duration-300"
+          className="absolute top-1/2 left-4 transform -translate-y-1/2 z-20 glass-effect rounded-full w-10 h-10 hover:bg-white/90 transition-all duration-300"
         >
-          <ChevronLeftIcon className="w-5 h-5 text-gray-700" />
+          <ChevronLeftIcon className="w-4 h-4 text-gray-700" />
         </Button>
         <Button
           variant="ghost"
@@ -181,145 +183,92 @@ function ShoppingHome() {
               (prevSlide) => (prevSlide + 1) % featureImageList.length
             )
           }
-          className="absolute top-1/2 right-4 md:right-8 transform -translate-y-1/2 z-20 glass-effect rounded-full w-12 h-12 hover:bg-white/90 transition-all duration-300"
+          className="absolute top-1/2 right-4 transform -translate-y-1/2 z-20 glass-effect rounded-full w-10 h-10 hover:bg-white/90 transition-all duration-300"
         >
-          <ChevronRightIcon className="w-5 h-5 text-gray-700" />
+          <ChevronRightIcon className="w-4 h-4 text-gray-700" />
         </Button>
 
-        {/* Slide indicators */}
-        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-20 flex gap-2">
+        {/* Minimal slide indicators */}
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 flex gap-1.5">
           {featureImageList.map((_, index) => (
             <button
               key={index}
               onClick={() => setCurrentSlide(index)}
               className={`h-1 rounded-full transition-all duration-300 ${
                 index === currentSlide 
-                  ? "w-8 bg-white" 
-                  : "w-1 bg-white/50 hover:bg-white/75"
+                  ? "w-6 bg-white" 
+                  : "w-1 bg-white/40 hover:bg-white/60"
               }`}
             />
           ))}
         </div>
       </div>
 
-      {/* Elegant spacing */}
-      <div className="h-16 md:h-24" />
-
-      {/* Categories Section with Luxury Design */}
-      <section className="py-12 md:py-20">
-        <div className="container mx-auto px-4 md:px-6 lg:px-8">
-          {/* Section header */}
-          <div className="text-center mb-12 md:mb-16 fade-in">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-light text-gray-900 mb-3 tracking-tight">
-              Discover Our Collection
-            </h2>
-            <div className="w-24 h-[1px] bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-4" />
-            <p className="text-gray-600 font-light text-sm md:text-base tracking-wide">
-              Curated categories for discerning families
-            </p>
+      {/* Compact Intro with CTA - draws eye to products below */}
+      <section className="py-8 md:py-12 bg-gradient-to-b from-white to-gray-50/30">
+        <div className="container mx-auto px-4 md:px-6 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-50 border border-amber-100 mb-4 fade-in">
+            <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+            <span className="text-xs font-light text-amber-900 tracking-wide">Handpicked Collection</span>
           </div>
+          
+          <h1 className="text-2xl md:text-3xl lg:text-4xl font-light text-gray-900 mb-3 tracking-tight fade-in">
+            Educational Toys & Timeless Games
+          </h1>
+          
+          <p className="text-sm md:text-base text-gray-600 font-light max-w-2xl mx-auto mb-6 fade-in">
+            Premium quality products that inspire learning, creativity, and family bonding
+          </p>
 
-          {/* Category grid */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 md:gap-6 stagger-fade-in">
-            {categoriesWithIcon.map((categoryItem, index) => (
-              <Card
-                key={categoryItem.id}
-                onClick={() =>
-                  handleNavigateToListingPage(categoryItem, "category")
-                }
-                className="product-card-luxury cursor-pointer group"
+          {/* Quick category pills */}
+          <div className="flex flex-wrap justify-center gap-2 mb-4">
+            {categoriesWithIcon.slice(0, 5).map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => handleNavigateToListingPage(cat, "category")}
+                className="px-4 py-2 text-xs font-light text-gray-700 bg-white border border-gray-200 rounded-full hover:border-amber-300 hover:bg-amber-50 transition-all duration-300"
               >
-                <CardContent className="flex flex-col items-center justify-center p-6 md:p-8">
-                  <div className="w-16 h-16 md:w-20 md:h-20 mb-4 flex items-center justify-center rounded-full bg-gradient-to-br from-gray-50 to-amber-50 group-hover:from-amber-50 group-hover:to-yellow-50 transition-all duration-500">
-                    <categoryItem.icon className="w-8 h-8 md:w-10 md:h-10 text-gray-700 group-hover:text-amber-600 transition-colors duration-300" />
-                  </div>
-                  <span className="font-light text-sm md:text-base text-gray-700 text-center group-hover:text-gray-900 transition-colors duration-300">
-                    {categoryItem.label}
-                  </span>
-                </CardContent>
-              </Card>
+                {cat.label}
+              </button>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Brand Story Section */}
-      <section className="py-16 md:py-24 luxury-gradient">
+      {/* MAIN FOCUS: Featured Products - Large, Prominent Display */}
+      <section className="py-8 md:py-16 bg-white">
         <div className="container mx-auto px-4 md:px-6 lg:px-8">
-          <div className="max-w-4xl mx-auto text-center space-y-8 fade-in">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/60 backdrop-blur-sm border border-gray-200/50">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span className="text-sm font-light text-gray-700 tracking-wide">Our Story</span>
-            </div>
-            
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-light text-gray-900 leading-tight">
-              A Family-First Toy Haven
-            </h2>
-            
-            <p className="text-gray-600 font-light text-base md:text-lg leading-relaxed max-w-3xl mx-auto">
-              Born from a mother of five's passion for child-driven development, our family-run business 
-              is committed to rediscovering joy beyond screens — encouraging creativity, play, and family 
-              bonding through classic and new-age games.
-            </p>
-
-            {/* Value propositions */}
-            <div className="grid md:grid-cols-3 gap-8 md:gap-12 pt-8">
-              <div className="flex flex-col items-center space-y-3 slide-in-left">
-                <div className="w-16 h-16 rounded-full bg-white shadow-luxury flex items-center justify-center">
-                  <Award className="w-8 h-8 text-amber-500" />
-                </div>
-                <h3 className="text-lg font-light text-gray-900">Curated Selection</h3>
-                <p className="text-sm text-gray-600 font-light leading-relaxed">
-                  We stay ahead of trends and dig into the archives of forgotten fun — reviving excitement with every product.
-                </p>
-              </div>
-
-              <div className="flex flex-col items-center space-y-3 slide-in-left" style={{ animationDelay: '0.1s' }}>
-                <div className="w-16 h-16 rounded-full bg-white shadow-luxury flex items-center justify-center">
-                  <Heart className="w-8 h-8 text-amber-500" />
-                </div>
-                <h3 className="text-lg font-light text-gray-900">Personal Touch</h3>
-                <p className="text-sm text-gray-600 font-light leading-relaxed">
-                  From order to doorstep, we are with you. Real people, real follow-up, real support.
-                </p>
-              </div>
-
-              <div className="flex flex-col items-center space-y-3 slide-in-left" style={{ animationDelay: '0.2s' }}>
-                <div className="w-16 h-16 rounded-full bg-white shadow-luxury flex items-center justify-center">
-                  <Shield className="w-8 h-8 text-amber-500" />
-                </div>
-                <h3 className="text-lg font-light text-gray-900">Secure Shopping</h3>
-                <p className="text-sm text-gray-600 font-light leading-relaxed">
-                  Our encrypted payment gateway ensures your personal and payment info stays safe.
+          {/* Minimal header - doesn't compete with products */}
+          <div className="flex items-center justify-between mb-8 md:mb-12">
+            <div className="flex items-center gap-3">
+              <div className="w-1 h-8 bg-gradient-to-b from-amber-400 to-yellow-500 rounded-full" />
+              <div>
+                <h2 className="text-2xl md:text-3xl font-light text-gray-900 tracking-tight">
+                  Featured Products
+                </h2>
+                <p className="text-xs md:text-sm text-gray-500 font-light mt-0.5">
+                  {productList?.length || 0} items available
                 </p>
               </div>
             </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Products Section */}
-      <section className="py-16 md:py-24">
-        <div className="container mx-auto px-4 md:px-6 lg:px-8">
-          {/* Section header */}
-          <div className="text-center mb-12 md:mb-16 fade-in">
-            <h2 className="text-3xl md:text-4xl lg:text-5xl font-light text-gray-900 mb-3 tracking-tight">
-              Featured Collection
-            </h2>
-            <div className="w-24 h-[1px] bg-gradient-to-r from-transparent via-amber-400 to-transparent mx-auto mb-4" />
-            <p className="text-gray-600 font-light text-sm md:text-base tracking-wide">
-              Handpicked educational treasures and timeless games
-            </p>
+            
+            <Button
+              onClick={() => navigate("/shop/listing")}
+              variant="ghost"
+              className="text-sm font-light text-gray-700 hover:text-amber-600 elegant-underline"
+            >
+              View All
+            </Button>
           </div>
 
-          {/* Products grid */}
+          {/* Products Grid - The Star of the Show */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 md:gap-8">
-            {productList && productList.length > 0 &&
+            {productList && productList.length > 0 ? (
               productList.map((productItem, index) => (
                 <div 
                   key={productItem._id}
                   className="fade-in"
-                  style={{ animationDelay: `${index * 0.1}s` }}
+                  style={{ animationDelay: `${index * 0.05}s` }}
                 >
                   <ShoppingProductTile
                     handleGetProductDetails={handleGetProductDetails}
@@ -327,7 +276,93 @@ function ShoppingHome() {
                     handleAddtoCart={handleAddtoCart}
                   />
                 </div>
-              ))}
+              ))
+            ) : (
+              <div className="col-span-full text-center py-16">
+                <p className="text-gray-500 font-light">Loading products...</p>
+              </div>
+            )}
+          </div>
+
+          {/* Browse more CTA */}
+          <div className="text-center mt-12 md:mt-16">
+            <Button
+              onClick={() => navigate("/shop/listing")}
+              className="h-12 px-8 bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 text-white font-light tracking-wide rounded-lg transition-all duration-300 shadow-lg hover:shadow-xl"
+            >
+              Explore Full Collection
+            </Button>
+          </div>
+        </div>
+      </section>
+
+      {/* Compact Categories - Secondary to products */}
+      <section className="py-12 md:py-16 bg-gray-50/50">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8">
+          <div className="text-center mb-8">
+            <h2 className="text-xl md:text-2xl font-light text-gray-900 mb-2">
+              Shop by Category
+            </h2>
+            <p className="text-sm text-gray-600 font-light">
+              Curated collections for every interest
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3 md:gap-4">
+            {categoriesWithIcon.map((categoryItem, index) => (
+              <button
+                key={categoryItem.id}
+                onClick={() => handleNavigateToListingPage(categoryItem, "category")}
+                className="group p-4 md:p-6 bg-white border border-gray-100 rounded-xl hover:border-amber-200 hover:shadow-md transition-all duration-300 fade-in"
+                style={{ animationDelay: `${index * 0.05}s` }}
+              >
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-12 h-12 md:w-14 md:h-14 flex items-center justify-center rounded-full bg-gray-50 group-hover:bg-amber-50 transition-colors duration-300">
+                    <categoryItem.icon className="w-6 h-6 md:w-7 md:h-7 text-gray-600 group-hover:text-amber-600 transition-colors duration-300" />
+                  </div>
+                  <span className="text-xs md:text-sm font-light text-gray-700 text-center group-hover:text-gray-900 transition-colors duration-300">
+                    {categoryItem.label}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Minimal Trust Signals - Compact, bottom of page */}
+      <section className="py-12 md:py-16 bg-white border-y border-gray-100">
+        <div className="container mx-auto px-4 md:px-6 lg:px-8">
+          <div className="grid md:grid-cols-3 gap-8 max-w-4xl mx-auto">
+            <div className="flex flex-col items-center text-center space-y-2 fade-in">
+              <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+                <Award className="w-6 h-6 text-amber-600" />
+              </div>
+              <h3 className="text-sm font-light text-gray-900">Curated Selection</h3>
+              <p className="text-xs text-gray-600 font-light">
+                Every product handpicked for quality
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center text-center space-y-2 fade-in" style={{ animationDelay: '0.1s' }}>
+              <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+                <Heart className="w-6 h-6 text-amber-600" />
+              </div>
+              <h3 className="text-sm font-light text-gray-900">Family Owned</h3>
+              <p className="text-xs text-gray-600 font-light">
+                Real people, real care
+              </p>
+            </div>
+
+            <div className="flex flex-col items-center text-center space-y-2 fade-in" style={{ animationDelay: '0.2s' }}>
+              <div className="w-12 h-12 rounded-full bg-amber-50 flex items-center justify-center">
+                <Shield className="w-6 h-6 text-amber-600" />
+              </div>
+              <h3 className="text-sm font-light text-gray-900">Secure Shopping</h3>
+              <p className="text-xs text-gray-600 font-light">
+                Your data is protected
+              </p>
+            </div>
           </div>
         </div>
       </section>
@@ -338,23 +373,20 @@ function ShoppingHome() {
         productDetails={productDetails}
       />
 
-      {/* Elegant Footer */}
-      <footer className="bg-gradient-to-b from-gray-50 to-gray-100 py-12 md:py-16 mt-16 border-t border-gray-200/50">
+      {/* Minimal Footer */}
+      <footer className="bg-gray-50 py-8 border-t border-gray-100">
         <div className="container mx-auto px-4 md:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
-            <div className="text-center md:text-left">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 text-center md:text-left">
+            <div>
               <p className="text-sm text-gray-600 font-light">
-                © 2025 Kenya Magic Toy Shop. All rights reserved.
+                © 2025 Kenya Magic Toy Shop
               </p>
-              <p className="text-xs text-gray-500 font-light mt-1">
-                Crafted with care for families
+              <p className="text-xs text-gray-500 font-light mt-0.5">
+                Premium toys for thoughtful families
               </p>
             </div>
-            <div className="flex flex-col md:flex-row items-center gap-4">
+            <div className="flex flex-col md:flex-row items-center gap-3">
               <TermsAndConditionsSheet />
-              <p className="text-xs text-gray-500 font-light max-w-md text-center">
-                By using our website, you agree to our terms and conditions
-              </p>
             </div>
           </div>
         </div>
