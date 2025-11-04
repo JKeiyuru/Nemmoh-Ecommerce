@@ -5,7 +5,7 @@ import { Card, CardContent, CardFooter } from "../ui/card";
 import { Button } from "../ui/button";
 import { categoryOptionsMap } from "@/config";
 import { Badge } from "../ui/badge";
-import { Heart } from "lucide-react";
+import { Heart, ShoppingBag } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -47,12 +47,12 @@ function ShoppingProductTile({
       if (isWishlisted) {
         await dispatch(removeFromWishlist({ userId: user.id, productId: product._id }));
         toast({
-          title: "Product removed from wishlist",
+          title: "Removed from wishlist",
         });
       } else {
         await dispatch(addToWishlist({ userId: user.id, productId: product._id }));
         toast({
-          title: "Product added to wishlist",
+          title: "Added to wishlist",
         });
       }
 
@@ -65,7 +65,8 @@ function ShoppingProductTile({
     }
   };
 
-  const handleAddToCartClick = () => {
+  const handleAddToCartClick = (e) => {
+    e.stopPropagation();
     if (!isAuthenticated || !user) {
       toast({
         title: "Please login to add items to cart.",
@@ -80,82 +81,115 @@ function ShoppingProductTile({
   };
 
   return (
-    <Card className="relative w-full max-w-sm mx-auto">
+    <Card className="group relative overflow-hidden bg-white border border-gray-100 hover:border-gray-200 transition-all duration-500 hover:shadow-luxury-lg rounded-xl">
       {/* Wishlist Button */}
-      <div className="absolute top-2 right-2 z-10">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="bg-white/70 hover:bg-white"
-          onClick={toggleWishlist}
-        >
-          {isWishlisted ? (
-            <Heart className="w-5 h-5 text-red-500 fill-red-500" />
-          ) : (
-            <Heart className="w-5 h-5" />
-          )}
-        </Button>
-      </div>
+      <button
+        onClick={toggleWishlist}
+        className="absolute top-3 right-3 z-20 w-10 h-10 rounded-full glass-effect flex items-center justify-center transition-all duration-300 hover:bg-white/90 hover:scale-110"
+      >
+        <Heart
+          className={`w-5 h-5 transition-all duration-300 ${
+            isWishlisted
+              ? "fill-red-500 text-red-500"
+              : "text-gray-600 group-hover:text-red-400"
+          }`}
+        />
+      </button>
 
-      {/* Product Click Section */}
-      <div onClick={() => handleGetProductDetails(product?._id)}>
-        <div className="relative">
+      {/* Product Image Section */}
+      <div
+        onClick={() => handleGetProductDetails(product?._id)}
+        className="relative cursor-pointer overflow-hidden"
+      >
+        {/* Image container with zoom effect */}
+        <div className="relative h-[280px] md:h-[320px] overflow-hidden bg-gray-50">
           <img
             src={product?.image}
             alt={product?.title}
-            className="w-full h-[300px] object-cover rounded-t-lg cursor-pointer"
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           />
+          
+          {/* Gradient overlay on hover */}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+        </div>
+
+        {/* Status badges */}
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
           {product?.totalStock === 0 ? (
-            <Badge className="absolute top-2 left-2 bg-red-500 hover:bg-red-600">
-              Out Of Stock
+            <Badge className="glass-effect border-0 text-xs font-light tracking-wide px-3 py-1">
+              <span className="text-gray-700">Out Of Stock</span>
             </Badge>
           ) : product?.totalStock < 10 ? (
-            <Badge className="absolute top-2 left-2 bg-red-500 hover:bg-red-600">
-              {`Only ${product?.totalStock} items left`}
+            <Badge className="bg-amber-50/90 backdrop-blur-sm border border-amber-200/50 text-amber-900 text-xs font-light tracking-wide px-3 py-1 hover:bg-amber-50">
+              Only {product?.totalStock} left
             </Badge>
           ) : product?.salePrice > 0 ? (
-            <Badge className="absolute top-2 left-2 bg-red-500 hover:bg-red-600">
-              Sale
+            <Badge className="bg-gradient-to-r from-amber-400 to-yellow-400 border-0 text-white text-xs font-light tracking-wide px-3 py-1 shadow-lg">
+              Special Offer
             </Badge>
           ) : null}
         </div>
-
-        <CardContent className="p-4 cursor-pointer">
-          <h2 className="text-xl font-bold mb-2">{product?.title}</h2>
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-[16px] text-muted-foreground">
-              {categoryOptionsMap[product?.category]}
-            </span>
-          </div>
-          <div className="flex justify-between items-center mb-2">
-            <span
-              className={`${
-                product?.salePrice > 0 ? "line-through" : ""
-              } text-lg font-semibold text-primary`}
-            >
-              KES{product?.price}
-            </span>
-            {product?.salePrice > 0 ? (
-              <span className="text-lg font-semibold text-primary">
-                KES{product?.salePrice}
-              </span>
-            ) : null}
-          </div>
-        </CardContent>
       </div>
 
-      {/* Cart Button */}
-      <CardFooter>
+      {/* Product Details */}
+      <CardContent
+        onClick={() => handleGetProductDetails(product?._id)}
+        className="p-5 cursor-pointer space-y-3"
+      >
+        {/* Category */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-light text-gray-500 tracking-widest uppercase">
+            {categoryOptionsMap[product?.category]}
+          </span>
+        </div>
+
+        {/* Product Title */}
+        <h3 className="text-base md:text-lg font-light text-gray-900 leading-snug line-clamp-2 group-hover:text-gray-700 transition-colors duration-300">
+          {product?.title}
+        </h3>
+
+        {/* Price Section */}
+        <div className="flex items-center gap-3">
+          {product?.salePrice > 0 ? (
+            <>
+              <span className="text-lg md:text-xl font-light text-gray-400 line-through">
+                KES {product?.price}
+              </span>
+              <span className="text-xl md:text-2xl font-light text-amber-600">
+                KES {product?.salePrice}
+              </span>
+            </>
+          ) : (
+            <span className="text-xl md:text-2xl font-light text-gray-900">
+              KES {product?.price}
+            </span>
+          )}
+        </div>
+
+        {/* Savings badge for sale items */}
+        {product?.salePrice > 0 && (
+          <div className="inline-flex items-center gap-1 text-xs text-amber-700 font-light">
+            <span>Save KES {product?.price - product?.salePrice}</span>
+          </div>
+        )}
+      </CardContent>
+
+      {/* Add to Cart Button */}
+      <CardFooter className="p-5 pt-0">
         {product?.totalStock === 0 ? (
-          <Button className="w-full opacity-60 cursor-not-allowed">
+          <Button
+            disabled
+            className="w-full h-11 bg-gray-100 text-gray-400 hover:bg-gray-100 cursor-not-allowed rounded-lg font-light tracking-wide"
+          >
             Out Of Stock
           </Button>
         ) : (
           <Button
             onClick={handleAddToCartClick}
-            className="w-full"
+            className="w-full h-11 bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 text-white rounded-lg font-light tracking-wide transition-all duration-300 group/btn shadow-md hover:shadow-lg"
           >
-            Add to cart
+            <ShoppingBag className="w-4 h-4 mr-2 transition-transform duration-300 group-hover/btn:scale-110" />
+            Add to Cart
           </Button>
         )}
       </CardFooter>

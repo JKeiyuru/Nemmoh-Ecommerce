@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 // client/src/components/shopping-view/header.jsx
-import { HousePlug, LogOut, Menu, ShoppingCart, UserCog, Heart, HeartOff, Phone, MapPin, Clock, Truck, ChevronDown, ChevronUp } from "lucide-react";
+import { HousePlug, LogOut, Menu, ShoppingCart, UserCog, Heart, HeartOff, Phone, MapPin, Clock, Truck, X } from "lucide-react";
 import logo from "../../assets/Tempara1.5.jpg";
 import {
   Link,
@@ -55,19 +55,17 @@ function MenuItems() {
   }
 
   return (
-    <div className="flex flex-col gap-2">
-      <nav className="flex flex-col mb-3 lg:mb-0 lg:items-center gap-6 lg:flex-row pt-8 lg:pt-6">
-        {shoppingViewHeaderMenuItems.map((menuItem) => (
-          <Label
-            onClick={() => handleNavigate(menuItem)}
-            className="text-sm font-medium cursor-pointer hover:text-emerald-600 transition-colors"
-            key={menuItem.id}
-          >
-            {menuItem.label}
-          </Label>
-        ))}
-      </nav>
-    </div>
+    <nav className="flex flex-col lg:flex-row lg:items-center gap-1 lg:gap-2">
+      {shoppingViewHeaderMenuItems.map((menuItem) => (
+        <button
+          key={menuItem.id}
+          onClick={() => handleNavigate(menuItem)}
+          className="text-sm font-light text-gray-700 hover:text-gray-900 px-4 py-2 rounded-lg hover:bg-gray-50 transition-all duration-300 text-left lg:text-center elegant-underline"
+        >
+          {menuItem.label}
+        </button>
+      ))}
+    </nav>
   );
 }
 
@@ -121,23 +119,38 @@ function HeaderRightContent() {
   };
 
   return (
-    <div className="flex lg:items-center lg:flex-row flex-col gap-4">
+    <div className="flex items-center gap-2 lg:gap-3">
+      {/* Wishlist */}
+      <Sheet open={openWishlistSheet} onOpenChange={setOpenWishlistSheet}>
+        <button
+          onClick={handleWishlistClick}
+          className="relative p-2 hover:bg-gray-50 rounded-lg transition-all duration-300 group"
+        >
+          <Heart className="w-5 h-5 text-gray-700 group-hover:text-red-500 transition-colors duration-300" />
+          {isAuthenticated && wishlistItems?.length > 0 && (
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-xs font-light rounded-full flex items-center justify-center">
+              {wishlistItems.length}
+            </span>
+          )}
+        </button>
+        {isAuthenticated && (
+          <WishlistSheet setOpenWishlistSheet={setOpenWishlistSheet} />
+        )}
+      </Sheet>
+
       {/* Cart */}
       <Sheet open={openCartSheet} onOpenChange={() => setOpenCartSheet(false)}>
-        <Button
+        <button
           onClick={handleCartClick}
-          variant="outline"
-          size="icon"
-          className="relative"
+          className="relative p-2 hover:bg-gray-50 rounded-lg transition-all duration-300 group"
         >
-          <ShoppingCart className="w-6 h-6" />
+          <ShoppingCart className="w-5 h-5 text-gray-700 group-hover:text-amber-600 transition-colors duration-300" />
           {isAuthenticated && (
-            <span className="absolute top-[-5px] right-[2px] font-bold text-sm">
+            <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs font-light rounded-full flex items-center justify-center">
               {cartItems?.items?.length || 0}
             </span>
           )}
-          <span className="sr-only">User cart</span>
-        </Button>
+        </button>
         {isAuthenticated && (
           <UserCartWrapper
             setOpenCartSheet={setOpenCartSheet}
@@ -148,46 +161,35 @@ function HeaderRightContent() {
         )}
       </Sheet>
 
-      {/* Wishlist */}
-      <Sheet open={openWishlistSheet} onOpenChange={setOpenWishlistSheet}>
-        <Button
-          onClick={handleWishlistClick}
-          variant="outline"
-          size="icon"
-          className="relative"
-        >
-          <HeartOff className="w-6 h-6 text-red-500" />
-          {isAuthenticated && (
-            <span className="absolute top-[-5px] right-[2px] font-bold text-sm">
-              {wishlistItems?.length || 0}
-            </span>
-          )}
-          <span className="sr-only">User wishlist</span>
-        </Button>
-        {isAuthenticated && (
-          <WishlistSheet setOpenWishlistSheet={setOpenWishlistSheet} />
-        )}
-      </Sheet>
-
-      {/* Account or Login Button */}
+      {/* Account or Login */}
       {isAuthenticated && user ? (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Avatar className="bg-black hover:cursor-pointer">
-              <AvatarFallback className="bg-black text-white font-extrabold">
-                {user?.userName[0].toUpperCase()}
-              </AvatarFallback>
-            </Avatar>
+            <button className="flex items-center gap-2 p-2 hover:bg-gray-50 rounded-lg transition-all duration-300">
+              <Avatar className="w-8 h-8 bg-gradient-to-br from-gray-700 to-gray-900">
+                <AvatarFallback className="bg-transparent text-white text-sm font-light">
+                  {user?.userName[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+            </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent side="right" className="w-56">
-            <DropdownMenuLabel>Logged in as {user?.userName}</DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={() => navigate("/shop/account")}>
+          <DropdownMenuContent align="end" className="w-56 glass-effect">
+            <DropdownMenuLabel className="font-light text-gray-700">
+              {user?.userName}
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator className="bg-gray-200" />
+            <DropdownMenuItem 
+              onClick={() => navigate("/shop/account")}
+              className="cursor-pointer font-light"
+            >
               <UserCog className="mr-2 h-4 w-4" />
               Account
             </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
+            <DropdownMenuSeparator className="bg-gray-200" />
+            <DropdownMenuItem 
+              onClick={handleLogout}
+              className="cursor-pointer font-light text-red-600"
+            >
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>
@@ -196,146 +198,115 @@ function HeaderRightContent() {
       ) : (
         <Button 
           onClick={() => navigate("/auth/login")}
-          variant="default"
-          size="sm"
+          className="h-9 px-6 bg-gradient-to-r from-gray-900 to-gray-800 hover:from-gray-800 hover:to-gray-700 text-white font-light tracking-wide rounded-lg transition-all duration-300"
         >
-          Login
+          Sign In
         </Button>
       )}
     </div>
   );
 }
 
-function MobileContactInfo() {
-  const [isExpanded, setIsExpanded] = useState(false);
+function ShoppingHeader() {
+  const { isAuthenticated } = useSelector((state) => state.auth);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <div className="lg:hidden">
-      {/* Compact Contact Bar */}
-      <div className="bg-gradient-to-r from-red-900 to-black px-3 py-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4 text-xs text-white overflow-hidden">
-            <div className="flex items-center whitespace-nowrap">
-              <Phone className="h-3 w-3 mr-1 text-red-400 flex-shrink-0" />
-              <span className="font-medium">0736601307</span>
+    <header className="fixed top-0 left-0 right-0 z-50 w-full bg-white/95 backdrop-blur-md border-b border-gray-200/50 shadow-sm">
+      {/* Top info bar - Desktop only */}
+      <div className="hidden lg:block border-b border-gray-100">
+        <div className="container mx-auto px-6">
+          <div className="flex items-center justify-between h-10 text-xs font-light text-gray-600">
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Phone className="w-3 h-3 text-amber-500" />
+                <span>0736601307</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Clock className="w-3 h-3 text-amber-500" />
+                <span>6:30 AM - 6:00 PM</span>
+              </div>
             </div>
-            <div className="flex items-center whitespace-nowrap">
-              <Clock className="h-3 w-3 mr-1 text-red-400 flex-shrink-0" />
-              <span className="font-medium">6:30 AM - 6:00 PM</span>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <MapPin className="w-3 h-3 text-amber-500" />
+                <span>Magic Business Center, Nairobi</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Truck className="w-3 h-3 text-amber-500" />
+                <span>Express Delivery Available</span>
+              </div>
             </div>
           </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setIsExpanded(!isExpanded)}
-            className="h-6 w-6 p-0 text-white hover:bg-red-800/50"
-          >
-            {isExpanded ? (
-              <ChevronUp className="h-3 w-3" />
-            ) : (
-              <ChevronDown className="h-3 w-3" />
-            )}
-          </Button>
         </div>
-        
-        {/* Expanded Contact Info */}
-        {isExpanded && (
-          <div className="mt-3 pt-3 border-t border-red-700/50 space-y-2">
-            <div className="flex items-center text-xs text-white">
-              <MapPin className="h-3 w-3 mr-2 text-red-400 flex-shrink-0" />
-              <span className="font-semibold text-red-300">Location:</span>
-              <span className="ml-1 font-medium">Magic Business Center, Nairobi</span>
+      </div>
+
+      {/* Main header */}
+      <div className="container mx-auto px-4 md:px-6">
+        <div className="flex items-center justify-between h-16 md:h-20">
+          {/* Logo */}
+          <Link to="/shop/home" className="flex items-center gap-3 group">
+            <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg overflow-hidden shadow-md group-hover:shadow-lg transition-shadow duration-300">
+              <img src={logo} alt="Tempara Logo" className="w-full h-full object-cover" />
             </div>
-            
-            <div className="flex items-start text-xs text-white">
-              <Truck className="h-3 w-3 mr-2 text-red-400 flex-shrink-0 mt-0.5" />
-              <div>
-                <span className="font-semibold text-red-300">Express Delivery:</span>
-                <span className="ml-1 font-medium">Call for expedited delivery (extra cost)</span>
+            <div className="hidden md:flex flex-col">
+              <span className="text-lg font-light text-gray-900 tracking-tight">Tempara</span>
+              <span className="text-xs font-light text-gray-500 tracking-wide">Premium Toys</span>
+            </div>
+          </Link>
+
+          {/* Desktop Navigation */}
+          <div className="hidden lg:block">
+            <MenuItems />
+          </div>
+
+          {/* Right content */}
+          <div className="flex items-center gap-2">
+            <div className="hidden lg:block">
+              <HeaderRightContent />
+            </div>
+
+            {/* Mobile menu button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 hover:bg-gray-50 rounded-lg transition-colors duration-300"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6 text-gray-700" />
+              ) : (
+                <Menu className="w-6 h-6 text-gray-700" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        {mobileMenuOpen && (
+          <div className="lg:hidden py-4 border-t border-gray-100 slide-in-left">
+            <div className="space-y-4">
+              <MenuItems />
+              <div className="pt-4 border-t border-gray-100">
+                <HeaderRightContent />
+              </div>
+              
+              {/* Mobile contact info */}
+              <div className="pt-4 border-t border-gray-100 space-y-2 text-xs font-light text-gray-600">
+                <div className="flex items-center gap-2">
+                  <Phone className="w-3 h-3 text-amber-500" />
+                  <span>0736601307</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3 h-3 text-amber-500" />
+                  <span>6:30 AM - 6:00 PM</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <MapPin className="w-3 h-3 text-amber-500" />
+                  <span>Magic Business Center, Nairobi</span>
+                </div>
               </div>
             </div>
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-function DesktopContactInfo() {
-  return (
-    <div className="hidden lg:block mt-2">
-      <div className="bg-gradient-to-r from-red-900 to-black rounded-lg px-4 py-3 shadow-md">
-        <div className="grid grid-cols-1 xl:grid-cols-4 gap-3 text-xs">
-          <div className="flex items-center text-white">
-            <Phone className="h-3 w-3 mr-2 text-red-400" />
-            <span className="font-semibold text-red-300">Phone:</span>
-            <span className="ml-1 font-medium">0736601307</span>
-          </div>
-          
-          <div className="flex items-center text-white">
-            <MapPin className="h-3 w-3 mr-2 text-red-400" />
-            <span className="font-semibold text-red-300">Location:</span>
-            <span className="ml-1 font-medium">Magic Business Center, Nairobi</span>
-          </div>
-          
-          <div className="flex items-center text-white">
-            <Clock className="h-3 w-3 mr-2 text-red-400" />
-            <span className="font-semibold text-red-300">Hours:</span>
-            <span className="ml-1 font-medium">6:30 AM - 6:00 PM</span>
-          </div>
-          
-          <div className="flex items-center text-white">
-            <Truck className="h-3 w-3 mr-2 text-red-400" />
-            <span className="font-semibold text-red-300">Express:</span>
-            <span className="ml-1 font-medium">Call for expedited delivery (extra cost)</span>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ShoppingHeader() {
-  const { isAuthenticated } = useSelector((state) => state.auth);
-
-  return (
-    <header className="fixed top-0 left-0 right-0 z-50 w-full border-b bg-background shadow-md">
-      {/* Mobile Contact Info Bar */}
-      <MobileContactInfo />
-      
-      {/* Main Header */}
-      <div className="flex h-16 items-center justify-between px-4 md:px-6">
-        <Link to="/shop/home" className="flex items-center gap-2">
-          <HousePlug className="h-6 w-6 text-amber-800" />
-          <span className="font-bold">
-            <img src={logo} alt="Tempara Logo" className="h-10 w-20 inline" />
-          </span>
-        </Link>
-        
-        {/* Mobile Menu */}
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon" className="lg:hidden">
-              <Menu className="h-6 w-6" />
-              <span className="sr-only">Toggle header menu</span>
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-full max-w-xs">
-            <MenuItems />
-            <HeaderRightContent />
-          </SheetContent>
-        </Sheet>
-        
-        {/* Desktop Menu */}
-        <div className="hidden lg:block">
-          <MenuItems />
-          <DesktopContactInfo />
-        </div>
-
-        {/* Desktop Right Content */}
-        <div className="hidden lg:block">
-          <HeaderRightContent />
-        </div>
       </div>
     </header>
   );
