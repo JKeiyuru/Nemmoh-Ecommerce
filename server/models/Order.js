@@ -1,3 +1,4 @@
+// server/models/Order.js
 const mongoose = require("mongoose");
 
 const OrderSchema = new mongoose.Schema({
@@ -14,32 +15,55 @@ const OrderSchema = new mongoose.Schema({
   ],
   addressInfo: {
     addressId: String,
-    county: { type: String, required: true },
-    district: { type: String, required: true },
-    location: { type: String, required: true },
-    phone: { type: String, required: true },
+    county: String,
+    district: String,
+    location: String,
+    phone: String,
     notes: String,
-    deliveryCharge: { type: Number, required: true },
-    fullAddress: String, // Computed field for display: "Location, District, County"
+    deliveryCharge: Number,
+    fullAddress: String,
+    // Legacy fields for backward compatibility
+    address: String,
+    city: String,
+    pincode: String,
+    subCounty: String,
+    specificAddress: String,
+    deliveryFee: Number,
   },
   orderStatus: { 
     type: String, 
     default: "pending",
-    enum: ["pending", "confirmed", "processing", "shipped", "delivered", "cancelled"]
+    enum: [
+      "pending", 
+      "pending_verification", 
+      "confirmed", 
+      "processing", 
+      "inProcess",
+      "shipped", 
+      "inShipping",
+      "delivered", 
+      "cancelled",
+      "rejected"
+    ]
   },
-  paymentMethod: { type: String, required: true }, // e.g. 'paypal', 'mpesa'
+  paymentMethod: { type: String, required: true }, // e.g. 'paypal', 'mpesa', 'manual_mpesa'
   paymentStatus: { 
     type: String, 
     default: "pending",
-    enum: ["pending", "completed", "failed", "refunded"]
+    enum: ["pending", "awaiting_verification", "paid", "completed", "failed", "refunded"]
   },
-  totalAmount: { type: Number, required: true }, // Total including delivery
-  subtotalAmount: { type: Number, required: true }, // Subtotal without delivery
-  deliveryAmount: { type: Number, required: true }, // Delivery charge
+  totalAmount: { type: Number, required: true },
+  subtotalAmount: Number,
+  deliveryAmount: Number,
   orderDate: { type: Date, default: Date.now },
   orderUpdateDate: { type: Date, default: Date.now },
-  paymentId: String, // PayPal or Mpesa transaction ID
-  payerId: String,   // PayPal payer ID or Mpesa customer id
+  paymentId: String,
+  payerId: String,
+  
+  // Manual payment verification fields
+  paymentVerificationNote: String,
+  paymentVerifiedAt: Date,
+  verifiedBy: String,
   
   // Additional fields for better order management
   estimatedDeliveryDate: Date,
@@ -54,13 +78,20 @@ OrderSchema.index({ orderStatus: 1 });
 OrderSchema.index({ paymentStatus: 1 });
 OrderSchema.index({ "addressInfo.county": 1, "addressInfo.district": 1, "addressInfo.location": 1 });
 
-// Pre-save middleware to update orderUpdateDate and calculate fullAddress
+// Pre-save middleware to update orderUpdateDate
 OrderSchema.pre('save', function(next) {
   this.orderUpdateDate = new Date();
   
-  // Set full address for display purposes
-  if (this.addressInfo && this.addressInfo.location && this.addressInfo.district && this.addressInfo.county) {
-    this.addressInfo.fullAddress = `${this.addressInfo.location}, ${this.addressInfo.district}, ${this.addressInfo.county}`;
+  // Set full address for display purposes if not already set
+  if (this.addressInfo) {
+    // Handle both new and legacy field formats
+    const location = this.addressInfo.location || this.addressInfo.address;
+    const district = this.addressInfo.district || this.addressInfo.subCounty;
+    const county = this.addressInfo.county;
+    
+    if (location && district && county && !this.addressInfo.fullAddress) {
+      this.addressInfo.fullAddress = `${location}, ${district}, ${county}`;
+    }
   }
   
   next();
@@ -73,7 +104,7 @@ OrderSchema.methods.calculateTotal = function() {
   }, 0);
   
   this.subtotalAmount = subtotal;
-  this.deliveryAmount = this.addressInfo.deliveryCharge || 0;
+  this.deliveryAmount = this.addressInfo.deliveryCharge || this.addressInfo.deliveryFee || 0;
   this.totalAmount = subtotal + this.deliveryAmount;
   
   return this.totalAmount;
@@ -99,35 +130,19 @@ OrderSchema.methods.updateStatus = function(newStatus, notes = '') {
 // Static method to find orders by location (useful for delivery management)
 OrderSchema.statics.findByLocation = function(county, district, location) {
   return this.find({
-    "addressInfo.county": county,
-    "addressInfo.district": district,
-    "addressInfo.location": location
-  });
-};
-
-// Static method to get delivery statistics by location
-OrderSchema.statics.getDeliveryStats = function(county, district, location) {
-  return this.aggregate([
-    {
-      $match: {
+    $or: [
+      {
         "addressInfo.county": county,
         "addressInfo.district": district,
         "addressInfo.location": location
+      },
+      {
+        "addressInfo.county": county,
+        "addressInfo.subCounty": district,
+        "addressInfo.address": location
       }
-    },
-    {
-      $group: {
-        _id: {
-          county: "$addressInfo.county",
-          district: "$addressInfo.district",
-          location: "$addressInfo.location"
-        },
-        totalOrders: { $sum: 1 },
-        totalDeliveryAmount: { $sum: "$deliveryAmount" },
-        averageDeliveryCharge: { $avg: "$deliveryAmount" }
-      }
-    }
-  ]);
+    ]
+  });
 };
 
 module.exports = mongoose.model("Order", OrderSchema);

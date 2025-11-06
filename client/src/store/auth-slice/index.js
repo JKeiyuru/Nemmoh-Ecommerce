@@ -47,19 +47,39 @@ export const loginUser = createAsyncThunk(
   }
 );
 
-// Logout from both Firebase and Backend
+// Enhanced Logout with immediate state clear
 export const logoutUser = createAsyncThunk(
   "auth/logout",
-  async (_, { rejectWithValue }) => {
+  async (_, { dispatch, rejectWithValue }) => {
     try {
-      await signOut(auth);
-      const response = await axios.post(
-        `${API_BASE_URL}/api/auth/logout`,
-        {},
-        { withCredentials: true }
-      );
-      return response.data;
+      console.log('🚪 Starting logout process...');
+      
+      // Immediately clear auth state for instant UI update
+      dispatch(clearAuth());
+      
+      // Sign out from Firebase
+      try {
+        await signOut(auth);
+        console.log('✅ Firebase signout successful');
+      } catch (firebaseError) {
+        console.error('⚠️ Firebase signout error:', firebaseError);
+      }
+      
+      // Clear backend session
+      try {
+        await axios.post(
+          `${API_BASE_URL}/api/auth/logout`,
+          {},
+          { withCredentials: true }
+        );
+        console.log('✅ Backend logout successful');
+      } catch (backendError) {
+        console.error('⚠️ Backend logout error:', backendError);
+      }
+      
+      return { success: true };
     } catch (error) {
+      console.error('❌ Logout error:', error);
       return rejectWithValue(error.response?.data || error.message);
     }
   }
@@ -266,12 +286,12 @@ const authSlice = createSlice({
         state.authChecked = true;
       })
       
-      // Logout
+      // Logout - State already cleared by action
       .addCase(logoutUser.pending, (state) => {
-        state.isLoading = true;
+        state.isLoading = false; // Keep false for instant UI update
       })
       .addCase(logoutUser.fulfilled, (state) => {
-        console.log('👋 Logout successful');
+        console.log('👋 Logout fulfilled');
         state.isAuthenticated = false;
         state.user = null;
         state.firebaseUser = null;
@@ -279,7 +299,13 @@ const authSlice = createSlice({
         state.authChecked = true;
       })
       .addCase(logoutUser.rejected, (state) => {
+        // Even if logout fails, clear the state
+        console.log('⚠️ Logout rejected but clearing state anyway');
+        state.isAuthenticated = false;
+        state.user = null;
+        state.firebaseUser = null;
         state.isLoading = false;
+        state.authChecked = true;
       });
   },
 });

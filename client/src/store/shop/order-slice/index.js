@@ -1,7 +1,7 @@
+// client/src/store/shop/order-slice/index.js
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/config.js";
-
 
 const initialState = {
   approvalURL: null,
@@ -23,11 +23,24 @@ export const createNewOrder = createAsyncThunk(
   }
 );
 
+// New thunk for manual payment orders
+export const createManualPaymentOrder = createAsyncThunk(
+  "/order/createManualPaymentOrder",
+  async (orderData) => {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/shop/order/create-manual`,
+      orderData
+    );
+
+    return response.data;
+  }
+);
+
 export const capturePayment = createAsyncThunk(
   "/order/capturePayment",
   async ({ paymentId, payerId, orderId }) => {
     const response = await axios.post(
-      "${API_BASE_URL}/api/shop/order/capture",
+      `${API_BASE_URL}/api/shop/order/capture`,
       {
         paymentId,
         payerId,
@@ -86,6 +99,17 @@ const shoppingOrderSlice = createSlice({
       .addCase(createNewOrder.rejected, (state) => {
         state.isLoading = false;
         state.approvalURL = null;
+        state.orderId = null;
+      })
+      .addCase(createManualPaymentOrder.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(createManualPaymentOrder.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.orderId = action.payload.orderId;
+      })
+      .addCase(createManualPaymentOrder.rejected, (state) => {
+        state.isLoading = false;
         state.orderId = null;
       })
       .addCase(getAllOrdersByUserId.pending, (state) => {

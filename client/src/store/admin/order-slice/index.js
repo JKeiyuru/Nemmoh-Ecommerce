@@ -1,11 +1,13 @@
+/* eslint-disable no-unused-vars */
+// client/src/store/admin/order-slice/index.js
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/config.js";
 
-
 const initialState = {
   orderList: [],
   orderDetails: null,
+  isLoading: false,
 };
 
 export const getAllOrdersForAdmin = createAsyncThunk(
@@ -44,13 +46,40 @@ export const updateOrderStatus = createAsyncThunk(
   }
 );
 
+export const verifyPayment = createAsyncThunk(
+  "/order/verifyPayment",
+  async ({ id, paymentNote }) => {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/admin/orders/verify-payment/${id}`,
+      {
+        paymentNote,
+      }
+    );
+
+    return response.data;
+  }
+);
+
+export const rejectPayment = createAsyncThunk(
+  "/order/rejectPayment",
+  async ({ id, rejectionReason }) => {
+    const response = await axios.post(
+      `${API_BASE_URL}/api/admin/orders/reject-payment/${id}`,
+      {
+        rejectionReason,
+      }
+    );
+
+    return response.data;
+  }
+);
+
 const adminOrderSlice = createSlice({
   name: "adminOrderSlice",
   initialState,
   reducers: {
     resetOrderDetails: (state) => {
       console.log("resetOrderDetails");
-
       state.orderDetails = null;
     },
   },
@@ -77,6 +106,24 @@ const adminOrderSlice = createSlice({
       .addCase(getOrderDetailsForAdmin.rejected, (state) => {
         state.isLoading = false;
         state.orderDetails = null;
+      })
+      .addCase(verifyPayment.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(verifyPayment.fulfilled, (state, action) => {
+        state.isLoading = false;
+      })
+      .addCase(verifyPayment.rejected, (state) => {
+        state.isLoading = false;
+      })
+      .addCase(rejectPayment.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(rejectPayment.fulfilled, (state, action) => {
+        state.isLoading = false;
+      })
+      .addCase(rejectPayment.rejected, (state) => {
+        state.isLoading = false;
       });
   },
 });

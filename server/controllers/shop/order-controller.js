@@ -1,8 +1,11 @@
+// server/controllers/shop/order-controller.js
 const paypal = require("../../helpers/paypal");
-const { createToken, stkPush } = require("../../helpers/mpesa"); // Import M-Pesa helper
+const { createToken, stkPush } = require("../../helpers/mpesa");
+const { sendPendingVerificationEmail } = require("../common/email-controller");
 const Order = require("../../models/Order");
 const Cart = require("../../models/Cart");
 const Product = require("../../models/Product");
+const User = require("../../models/User");
 
 const createOrder = async (req, res) => {
   try {
@@ -27,8 +30,8 @@ const createOrder = async (req, res) => {
         payment_method: "paypal",
       },
       redirect_urls: {
-        return_url: "http://localhost:5173/shop/paypal-return",
-        cancel_url: "http://localhost:5173/shop/paypal-cancel",
+        return_url: `${process.env.CLIENT_URL}/shop/paypal-return`,
+        cancel_url: `${process.env.CLIENT_URL}/shop/paypal-cancel`,
       },
       transactions: [
         {
@@ -45,7 +48,7 @@ const createOrder = async (req, res) => {
             currency: "USD",
             total: totalAmount.toFixed(2),
           },
-          description: "description",
+          description: "Kenya Magic Toy Shop Purchase",
         },
       ],
     };
@@ -53,7 +56,6 @@ const createOrder = async (req, res) => {
     paypal.payment.create(create_payment_json, async (error, paymentInfo) => {
       if (error) {
         console.log(error);
-
         return res.status(500).json({
           success: false,
           message: "Error while creating paypal payment",
@@ -96,6 +98,89 @@ const createOrder = async (req, res) => {
   }
 };
 
+// New: Create order with manual payment verification
+const createManualPaymentOrder = async (req, res) => {
+  try {
+    const {
+      userId,
+      cartItems,
+      addressInfo,
+      orderStatus,
+      paymentMethod,
+      paymentStatus,
+      totalAmount,
+      subtotalAmount,
+      deliveryFee,
+      cartId,
+    } = req.body;
+
+    console.log('📝 Creating manual payment order for user:', userId);
+
+    // Get user details for email
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    // Create the order
+    const newOrder = new Order({
+      userId,
+      cartId,
+      cartItems,
+      addressInfo,
+      orderStatus: "pending_verification",
+      paymentMethod: "manual_mpesa",
+      paymentStatus: "awaiting_verification",
+      totalAmount,
+      subtotalAmount: subtotalAmount || totalAmount - (deliveryFee || 0),
+      deliveryAmount: deliveryFee || 0,
+      orderDate: new Date(),
+      orderUpdateDate: new Date(),
+      paymentVerificationNote: "Awaiting manual payment verification",
+    });
+
+    await newOrder.save();
+    console.log('✅ Order created:', newOrder._id);
+
+    // Send pending verification email
+    try {
+      const emailResult = await sendPendingVerificationEmail(user.email, {
+        orderId: newOrder._id,
+        totalAmount: newOrder.totalAmount,
+        customerName: user.userName,
+        orderItems: cartItems
+      });
+      
+      if (emailResult.success) {
+        console.log('✅ Pending verification email sent to:', user.email);
+      } else {
+        console.error('⚠️ Failed to send email:', emailResult.error);
+      }
+    } catch (emailError) {
+      console.error('⚠️ Email sending error:', emailError);
+      // Don't fail the order creation if email fails
+    }
+
+    res.status(201).json({
+      success: true,
+      message: "Order created successfully. Payment verification pending.",
+      orderId: newOrder._id,
+      order: newOrder,
+    });
+
+  } catch (error) {
+    console.error('❌ Error creating manual payment order:', error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to create order",
+      error: error.message,
+    });
+  }
+};
+
 const capturePayment = async (req, res) => {
   try {
     const { paymentId, payerId, orderId } = req.body;
@@ -125,7 +210,6 @@ const capturePayment = async (req, res) => {
       }
 
       product.totalStock -= item.quantity;
-
       await product.save();
     }
 
@@ -152,8 +236,8 @@ const initiateMpesaPayment = async (req, res) => {
   const { phone, amount, callbackUrl } = req.body;
 
   try {
-    const token = await createToken(); // ✅ get token
-    const stkResponse = await stkPush(token, phone, amount, callbackUrl); // ✅ pass token & data
+    const token = await createToken();
+    const stkResponse = await stkPush(token, phone, amount, callbackUrl);
 
     const newOrder = new Order({
       userId: req.body.userId,
@@ -179,12 +263,11 @@ const initiateMpesaPayment = async (req, res) => {
   }
 };
 
-
 const getAllOrdersByUser = async (req, res) => {
   try {
     const { userId } = req.params;
 
-    const orders = await Order.find({ userId });
+    const orders = await Order.find({ userId }).sort({ orderDate: -1 });
 
     if (!orders.length) {
       return res.status(404).json({
@@ -234,8 +317,9 @@ const getOrderDetails = async (req, res) => {
 
 module.exports = {
   createOrder,
+  createManualPaymentOrder,
   capturePayment,
   getAllOrdersByUser,
   getOrderDetails,
-  initiateMpesaPayment, // Add the new function
+  initiateMpesaPayment,
 };

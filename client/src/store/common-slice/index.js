@@ -1,7 +1,8 @@
+/* eslint-disable no-unused-vars */
+// client/src/store/common-slice/index.js
 import { createAsyncThunk, createSlice } from "@reduxjs/toolkit";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/config.js";
-
 
 const initialState = {
   isLoading: false,
@@ -9,7 +10,7 @@ const initialState = {
 };
 
 export const getFeatureImages = createAsyncThunk(
-  "/order/getFeatureImages",
+  "/common/getFeatureImages",
   async () => {
     const response = await axios.get(
       `${API_BASE_URL}/api/common/feature/get`
@@ -20,11 +21,22 @@ export const getFeatureImages = createAsyncThunk(
 );
 
 export const addFeatureImage = createAsyncThunk(
-  "/order/addFeatureImage",
+  "/common/addFeatureImage",
   async (image) => {
     const response = await axios.post(
       `${API_BASE_URL}/api/common/feature/add`,
       { image }
+    );
+
+    return response.data;
+  }
+);
+
+export const deleteFeatureImage = createAsyncThunk(
+  "/common/deleteFeatureImage",
+  async (id) => {
+    const response = await axios.delete(
+      `${API_BASE_URL}/api/common/feature/delete/${id}`
     );
 
     return response.data;
@@ -47,6 +59,15 @@ const commonSlice = createSlice({
       .addCase(getFeatureImages.rejected, (state) => {
         state.isLoading = false;
         state.featureImageList = [];
+      })
+      .addCase(deleteFeatureImage.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(deleteFeatureImage.fulfilled, (state, action) => {
+        state.isLoading = false;
+      })
+      .addCase(deleteFeatureImage.rejected, (state) => {
+        state.isLoading = false;
       });
   },
 });

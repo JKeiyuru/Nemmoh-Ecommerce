@@ -1,7 +1,9 @@
+// server/routes/shop/order-routes.js
 const express = require("express");
 
 const {
   createOrder,
+  createManualPaymentOrder,
   getAllOrdersByUser,
   getOrderDetails,
   capturePayment,
@@ -11,6 +13,7 @@ const {
 const router = express.Router();
 
 router.post("/create", createOrder);
+router.post("/create-manual", createManualPaymentOrder);
 router.post("/capture", capturePayment);
 router.post("/mpesa-payment", initiateMpesaPayment);
 router.get("/list/:userId", getAllOrdersByUser);

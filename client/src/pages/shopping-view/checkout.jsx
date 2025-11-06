@@ -1,19 +1,20 @@
 /* eslint-disable react/jsx-key */
 /* eslint-disable no-unused-vars */
+// client/src/pages/shopping-view/checkout.jsx
 import Address from "@/components/shopping-view/address";
 import img from "../../assets/account.jpg";
 import { useDispatch, useSelector } from "react-redux";
 import UserCartItemsContent from "@/components/shopping-view/cart-items-content";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
-import { createNewOrder } from "@/store/shop/order-slice";
+import { createNewOrder, createManualPaymentOrder } from "@/store/shop/order-slice";
 import { useToast } from "@/components/ui/use-toast";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Truck, ShoppingCart } from "lucide-react";
+import { Truck, ShoppingCart, CreditCard, Phone, CheckCircle, Info } from "lucide-react";
 import axios from "axios";
 import { API_BASE_URL } from "@/config/config.js";
-
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 function ShoppingCheckout() {
   const { cartItems } = useSelector((state) => state.shopCart);
@@ -24,8 +25,14 @@ function ShoppingCheckout() {
   const [isMpesaPaymentLoading, setIsMpesaPaymentLoading] = useState(false);
   const [showPhoneInput, setShowPhoneInput] = useState(false);
   const [phoneNumber, setPhoneNumber] = useState("");
+  const [showManualPayment, setShowManualPayment] = useState(false);
+  const [isManualPaymentLoading, setIsManualPaymentLoading] = useState(false);
   const dispatch = useDispatch();
   const { toast } = useToast();
+
+  // Paybill Details - Replace with your actual details
+  const PAYBILL_NUMBER = "247247"; // Replace with your actual paybill number
+  const ACCOUNT_NUMBER = "KENYAMAGIC"; // Replace with your account number format
 
   // Redirect to PayPal approval URL if present
   useEffect(() => {
@@ -210,6 +217,86 @@ function ShoppingCheckout() {
     }
   };
 
+  const handleManualPayment = async () => {
+    if (!cartItems || !cartItems.items || cartItems.items.length === 0) {
+      toast({
+        title: "Your cart is empty. Please add items to proceed",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (!currentSelectedAddress) {
+      toast({
+        title: "Please select one address to proceed.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsManualPaymentLoading(true);
+
+    const orderData = {
+      userId: user?.id,
+      cartId: cartItems?._id,
+      cartItems: cartItems.items.map((item) => ({
+        productId: item?.productId,
+        title: item?.title,
+        image: item?.image,
+        price: item?.salePrice > 0 ? item.salePrice : item.price,
+        quantity: item.quantity,
+      })),
+      addressInfo: {
+        addressId: currentSelectedAddress?._id,
+        address: currentSelectedAddress?.address,
+        county: currentSelectedAddress?.county,
+        subCounty: currentSelectedAddress?.subCounty,
+        location: currentSelectedAddress?.location,
+        specificAddress: currentSelectedAddress?.specificAddress,
+        phone: currentSelectedAddress?.phone,
+        notes: currentSelectedAddress?.notes,
+        deliveryFee: currentSelectedAddress?.deliveryFee,
+      },
+      orderStatus: "pending_verification",
+      paymentMethod: "manual_mpesa",
+      paymentStatus: "awaiting_verification",
+      subtotalAmount: subtotalAmount,
+      deliveryFee: deliveryFee,
+      totalAmount: totalCartAmount,
+      orderDate: new Date(),
+      orderUpdateDate: new Date(),
+    };
+
+    try {
+      const result = await dispatch(createManualPaymentOrder(orderData));
+      
+      if (result?.payload?.success) {
+        toast({
+          title: "Order placed successfully!",
+          description: "Please complete payment via M-Pesa and we'll verify it shortly.",
+        });
+        
+        // Redirect to account page to see order
+        setTimeout(() => {
+          window.location.href = "/shop/account";
+        }, 2000);
+      } else {
+        toast({
+          title: "Failed to place order",
+          description: result?.payload?.message || "Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error placing order",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsManualPaymentLoading(false);
+    }
+  };
+
   return (
     <div className="flex flex-col">
       <div className="relative h-[300px] w-full overflow-hidden">
@@ -300,45 +387,120 @@ function ShoppingCheckout() {
             </CardContent>
           </Card>
 
-          {/* Payment Buttons */}
+          {/* Payment Methods */}
           {cartItems?.items?.length > 0 && (
             <Card>
-              <CardContent className="p-6 space-y-4">
-                <h3 className="font-semibold text-lg mb-4">Payment Method</h3>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="w-5 h-5" />
+                  Payment Method
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                
+                {/* Manual M-Pesa Payment (Primary Option) */}
+                <div className="space-y-3">
+                  {!showManualPayment ? (
+                    <Button
+                      onClick={() => setShowManualPayment(true)}
+                      className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
+                      disabled={!currentSelectedAddress}
+                    >
+                      <Phone className="w-5 h-5 mr-2" />
+                      Pay via M-Pesa (Recommended)
+                    </Button>
+                  ) : (
+                    <div className="space-y-4 border-2 border-green-500 rounded-lg p-4">
+                      <Alert className="bg-green-50 border-green-200">
+                        <Info className="w-4 h-4" />
+                        <AlertTitle className="font-semibold">M-Pesa Payment Instructions</AlertTitle>
+                        <AlertDescription className="mt-2 space-y-2 text-sm">
+                          <p className="font-medium">Follow these steps to complete your payment:</p>
+                          <ol className="list-decimal list-inside space-y-1 ml-2">
+                            <li>Go to <strong>M-Pesa</strong> on your phone</li>
+                            <li>Select <strong>Lipa na M-Pesa</strong></li>
+                            <li>Select <strong>Paybill</strong></li>
+                            <li>Enter Business Number: <strong className="text-green-700">{PAYBILL_NUMBER}</strong></li>
+                            <li>Enter Account Number: <strong className="text-green-700">{ACCOUNT_NUMBER}</strong></li>
+                            <li>Enter Amount: <strong className="text-green-700">KSh {totalCartAmount.toFixed(2)}</strong></li>
+                            <li>Enter your M-Pesa PIN</li>
+                            <li>Click &quot;Complete Order&quot; below after sending payment</li>
+                          </ol>
+                          <div className="mt-3 p-3 bg-white rounded border border-green-300">
+                            <p className="font-semibold text-green-800">Payment Details:</p>
+                            <p className="text-xs mt-1">Paybill: <span className="font-mono font-bold">{PAYBILL_NUMBER}</span></p>
+                            <p className="text-xs">Account: <span className="font-mono font-bold">{ACCOUNT_NUMBER}</span></p>
+                            <p className="text-xs">Amount: <span className="font-mono font-bold">KSh {totalCartAmount.toFixed(2)}</span></p>
+                          </div>
+                          <p className="text-xs text-gray-600 mt-2">
+                            <strong>Note:</strong> Your order will be verified within 1-2 hours. 
+                            For urgent orders, call <strong>0799 654 321</strong>.
+                          </p>
+                        </AlertDescription>
+                      </Alert>
+                      
+                      <div className="flex gap-2">
+                        <Button
+                          onClick={handleManualPayment}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                          disabled={isManualPaymentLoading}
+                        >
+                          {isManualPaymentLoading ? (
+                            "Processing..."
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4 mr-2" />
+                              Complete Order
+                            </>
+                          )}
+                        </Button>
+                        <Button
+                          onClick={() => setShowManualPayment(false)}
+                          variant="outline"
+                          disabled={isManualPaymentLoading}
+                        >
+                          Cancel
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">
+                      Other Payment Options
+                    </span>
+                  </div>
+                </div>
                 
                 {/* PayPal Payment */}
                 <Button 
                   onClick={handleInitiatePaypalPayment} 
-                  className="w-full h-12 text-lg" 
+                  className="w-full h-12 text-lg bg-blue-600 hover:bg-blue-700" 
                   disabled={isPaymentStart || !currentSelectedAddress}
+                  variant="outline"
                 >
                   {isPaymentStart ? "Processing PayPal Payment..." : `Pay KSh ${totalCartAmount.toFixed(2)} with PayPal`}
                 </Button>
                 
-                {/* M-Pesa Payment */}
-                <div className="space-y-3">
-                  {showPhoneInput && (
-                    <div>
-                      <input
-                        type="tel"
-                        placeholder="Enter your M-Pesa phone number (254...)"
-                        value={phoneNumber}
-                        onChange={(e) => setPhoneNumber(e.target.value)}
-                        className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                      />
-                    </div>
-                  )}
+                {/* STK Push (Coming Soon) */}
+                <div className="relative">
                   <Button
-                    onClick={handleMpesaPayment}
-                    className="w-full h-12 text-lg bg-green-600 hover:bg-green-700"
-                    disabled={isMpesaPaymentLoading || !currentSelectedAddress}
+                    className="w-full h-12 text-lg bg-gray-400 cursor-not-allowed"
+                    disabled
                   >
-                    {isMpesaPaymentLoading
-                      ? "Processing M-Pesa Payment..."
-                      : showPhoneInput
-                      ? `Confirm M-Pesa Payment - KSh ${totalCartAmount.toFixed(2)}`
-                      : `Pay KSh ${totalCartAmount.toFixed(2)} with M-Pesa`}
+                    <Phone className="w-5 h-5 mr-2" />
+                    M-Pesa STK Push (Coming Soon)
                   </Button>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <span className="bg-yellow-500 text-white text-xs px-3 py-1 rounded-full font-semibold">
+                      Coming Soon
+                    </span>
+                  </div>
                 </div>
                 
                 {!currentSelectedAddress && (
