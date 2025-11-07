@@ -1,3 +1,4 @@
+/* eslint-disable no-undef */
 import path from "path";
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
@@ -26,6 +27,7 @@ export default defineConfig({
       ],
       changefreq: "weekly",
       priority: 0.8,
+      generateRobotsTxt: false, // ✅ Don’t auto-generate or open robots.txt
     }),
   ],
   resolve: {
