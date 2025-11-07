@@ -1,3 +1,5 @@
+/* eslint-disable react/jsx-key */
+/* eslint-disable react/prop-types */
 import { useNavigate } from "react-router-dom";
 import { Button } from "../ui/button";
 import { SheetContent, SheetHeader, SheetTitle } from "../ui/sheet";
@@ -32,7 +34,7 @@ function UserCartWrapper({ cartItems, setOpenCartSheet }) {
       <div className="mt-8 space-y-4">
         <div className="flex justify-between">
           <span className="font-bold">Total</span>
-          <span className="font-bold">${totalCartAmount}</span>
+          <span className="font-bold">KES {totalCartAmount}</span>
         </div>
       </div>
       <Button
