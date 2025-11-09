@@ -1,7 +1,7 @@
 /* eslint-disable no-unused-vars */
 // client/src/components/shopping-view/header.jsx
 import { HousePlug, LogOut, Menu, ShoppingCart, UserCog, Heart, HeartOff, Phone, MapPin, Clock, Truck, X } from "lucide-react";
-import logo from "../../assets/Tempara1.5.jpg";
+import logo from "../../assets/Kenya Magic Toy Shop Logo.png";
 import {
   Link,
   useLocation,
@@ -247,10 +247,10 @@ function ShoppingHeader() {
           {/* Logo */}
           <Link to="/shop/home" className="flex items-center gap-3 group">
             <div className="w-10 h-10 md:w-12 md:h-12 rounded-lg overflow-hidden shadow-md group-hover:shadow-lg transition-shadow duration-300">
-              <img src={logo} alt="Tempara Logo" className="w-full h-full object-cover" />
+              <img src={logo} alt="Kenya Magic Toy Shop Logo" className="w-full h-full object-cover" />
             </div>
             <div className="hidden md:flex flex-col">
-              <span className="text-lg font-light text-gray-900 tracking-tight">Tempara</span>
+              <span className="text-lg font-light text-gray-900 tracking-tight">KMTS</span>
               <span className="text-xs font-light text-gray-500 tracking-wide">Premium Toys</span>
             </div>
           </Link>
