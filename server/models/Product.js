@@ -24,6 +24,17 @@ const ProductSchema = new mongoose.Schema(
       trim: true,
       default: null
     },
+    // NEW: Array of additional product images
+    images: {
+      type: [String],
+      default: [],
+      validate: {
+        validator: function(arr) {
+          return arr.length <= 10; // Limit to 10 images max
+        },
+        message: "Cannot have more than 10 product images"
+      }
+    },
     title: {
       type: String,
       required: [true, "Product title is required"],
@@ -83,21 +94,41 @@ const ProductSchema = new mongoose.Schema(
   }
 );
 
-// Custom validation: Product must have either main image or variations
+// Custom validation: Product must have either main image, images array, or variations
 ProductSchema.pre('validate', function(next) {
-  // Check if both image and variations are empty/null
   const hasMainImage = this.image && this.image.trim().length > 0;
+  const hasMultipleImages = this.images && Array.isArray(this.images) && this.images.length > 0;
   const hasVariations = this.variations && Array.isArray(this.variations) && this.variations.length > 0;
   
-  if (!hasMainImage && !hasVariations) {
-    return next(new Error('Product must have either a main image or at least one variation'));
+  if (!hasMainImage && !hasMultipleImages && !hasVariations) {
+    return next(new Error('Product must have at least one image (main image, additional images, or variations)'));
   }
   next();
 });
 
-// Virtual for display image
+// Virtual for getting all product images
+ProductSchema.virtual('allImages').get(function() {
+  const imageArray = [];
+  
+  // Add main image first if exists
+  if (this.image && this.image.trim().length > 0) {
+    imageArray.push(this.image);
+  }
+  
+  // Add additional images
+  if (this.images && Array.isArray(this.images)) {
+    imageArray.push(...this.images.filter(img => img && img.trim().length > 0));
+  }
+  
+  return imageArray;
+});
+
+// Virtual for display image (backwards compatibility)
 ProductSchema.virtual('displayImage').get(function() {
   if (this.image && this.image.trim().length > 0) return this.image;
+  if (this.images && this.images.length > 0 && this.images[0]) {
+    return this.images[0];
+  }
   if (this.variations && this.variations.length > 0 && this.variations[0].image) {
     return this.variations[0].image;
   }

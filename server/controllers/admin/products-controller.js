@@ -30,6 +30,7 @@ const addProduct = async (req, res) => {
 
     const {
       image,
+      images, // NEW: Multiple images
       title,
       description,
       category,
@@ -48,23 +49,41 @@ const addProduct = async (req, res) => {
       });
     }
 
-    // Initialize parsedVariations as an empty array at the beginning
+    // Parse images array
+    let parsedImages = [];
+    if (images) {
+      try {
+        if (typeof images === 'string') {
+          parsedImages = JSON.parse(images);
+        } else if (Array.isArray(images)) {
+          parsedImages = images;
+        }
+        
+        // Filter out empty or invalid URLs
+        parsedImages = parsedImages.filter(img => 
+          img && typeof img === 'string' && img.trim().length > 0
+        );
+      } catch (err) {
+        console.error("Failed to parse images:", err);
+        parsedImages = [];
+      }
+    }
+
+    // If no images array but has single image, use it
+    if (parsedImages.length === 0 && image) {
+      parsedImages = [image];
+    }
+
+    // Parse variations
     let parsedVariations = [];
-    
-    // Parse variations if it exists
     if (variations) {
       try {
-        // Handle both stringified JSON and direct array
         if (typeof variations === 'string') {
           parsedVariations = JSON.parse(variations);
         } else if (Array.isArray(variations)) {
           parsedVariations = variations;
-        } else {
-          // If variations is not a string or array, set to empty array
-          parsedVariations = [];
         }
         
-        // Validate variations structure if we have any
         if (Array.isArray(parsedVariations) && parsedVariations.length > 0) {
           for (let i = 0; i < parsedVariations.length; i++) {
             const variation = parsedVariations[i];
@@ -78,23 +97,24 @@ const addProduct = async (req, res) => {
         }
       } catch (err) {
         console.error("Failed to parse variations:", err);
-        return res.status(400).json({
-          success: false,
-          message: "Invalid variations format. Must be a valid JSON array.",
-        });
+        parsedVariations = [];
       }
     }
 
-    // Validate that product has either main image or variations
-    if (!image && (!parsedVariations || parsedVariations.length === 0)) {
+    // Validate that product has at least one image
+    const hasImages = parsedImages.length > 0;
+    const hasVariations = parsedVariations.length > 0;
+    
+    if (!hasImages && !hasVariations) {
       return res.status(400).json({
         success: false,
-        message: "Product must have either a main image or at least one variation",
+        message: "Product must have at least one image (either main images or variations)",
       });
     }
 
     const productData = {
-      image: image || null,
+      image: parsedImages[0] || null, // First image as main (backward compatibility)
+      images: parsedImages, // NEW: All images
       title: title.trim(),
       description: description ? description.trim() : "",
       category: category.trim(),
@@ -102,15 +122,13 @@ const addProduct = async (req, res) => {
       salePrice: salePrice ? Number(salePrice) : 0,
       totalStock: Number(totalStock),
       averageReview: averageReview ? Number(averageReview) : 0,
-      variations: parsedVariations || []
+      variations: parsedVariations
     };
 
     console.log("Creating product with data:", {
       ...productData,
-      variations: productData.variations.map(v => ({
-        label: v.label,
-        hasImage: !!v.image
-      }))
+      imagesCount: productData.images.length,
+      variationsCount: productData.variations.length
     });
 
     const newProduct = new Product(productData);
@@ -118,6 +136,7 @@ const addProduct = async (req, res) => {
 
     console.log("Product saved successfully:", {
       id: savedProduct._id,
+      imagesCount: savedProduct.images.length,
       variationsCount: savedProduct.variations.length
     });
 
@@ -163,6 +182,7 @@ const editProduct = async (req, res) => {
 
     const {
       image,
+      images, // NEW: Multiple images
       title,
       description,
       category,
@@ -181,52 +201,71 @@ const editProduct = async (req, res) => {
       });
     }
 
-    // Initialize parsedVariations as an empty array at the beginning
+    // Parse images array
+    let parsedImages = [];
+    if (images) {
+      try {
+        if (typeof images === 'string') {
+          parsedImages = JSON.parse(images);
+        } else if (Array.isArray(images)) {
+          parsedImages = images;
+        }
+        
+        parsedImages = parsedImages.filter(img => 
+          img && typeof img === 'string' && img.trim().length > 0
+        );
+      } catch (err) {
+        console.error("Failed to parse images:", err);
+        parsedImages = [];
+      }
+    }
+
+    // If no images array but has single image, use it
+    if (parsedImages.length === 0 && image) {
+      parsedImages = [image];
+    }
+
+    // Parse variations
     let parsedVariations = [];
-    
-    // Parse variations if it exists
     if (variations) {
       try {
         if (typeof variations === "string") {
           parsedVariations = JSON.parse(variations);
         } else if (Array.isArray(variations)) {
           parsedVariations = variations;
-        } else {
-          // If variations is not a string or array, set to empty array
-          parsedVariations = [];
+        }
+        
+        if (parsedVariations && parsedVariations.length > 0) {
+          for (let i = 0; i < parsedVariations.length; i++) {
+            const variation = parsedVariations[i];
+            if (!variation.image || !variation.label) {
+              return res.status(400).json({
+                success: false,
+                message: `Variation ${i + 1} is missing image or label`,
+              });
+            }
+          }
         }
       } catch (err) {
         console.error("Failed to parse variations:", err);
-        return res.status(400).json({
-          success: false,
-          message: "Invalid variations format. Must be a valid JSON array.",
-        });
+        parsedVariations = [];
       }
     }
 
-    // Validate variations structure
-    if (parsedVariations && parsedVariations.length > 0) {
-      for (let i = 0; i < parsedVariations.length; i++) {
-        const variation = parsedVariations[i];
-        if (!variation.image || !variation.label) {
-          return res.status(400).json({
-            success: false,
-            message: `Variation ${i + 1} is missing image or label`,
-          });
-        }
-      }
-    }
-
-    // Validate that product has either main image or variations
-    if (!image && (!parsedVariations || parsedVariations.length === 0)) {
+    // Validate that product has at least one image
+    const hasImages = parsedImages.length > 0;
+    const hasVariations = parsedVariations.length > 0;
+    
+    if (!hasImages && !hasVariations) {
       return res.status(400).json({
         success: false,
-        message: "Product must have either a main image or at least one variation",
+        message: "Product must have at least one image (either main images or variations)",
       });
     }
 
     const updateData = {
-      image: image || null,
+      image: parsedImages[0] || null, // First image as main (backward compatibility)
+      images: parsedImages, // NEW: All images
       title: title.trim(),
       description: description ? description.trim() : "",
       category: category.trim(),
@@ -234,7 +273,7 @@ const editProduct = async (req, res) => {
       salePrice: salePrice ? Number(salePrice) : 0,
       totalStock: Number(totalStock),
       averageReview: averageReview ? Number(averageReview) : 0,
-      variations: parsedVariations || []
+      variations: parsedVariations
     };
 
     const updatedProduct = await Product.findByIdAndUpdate(
@@ -252,6 +291,7 @@ const editProduct = async (req, res) => {
 
     console.log("Product updated successfully:", {
       id: updatedProduct._id,
+      imagesCount: updatedProduct.images.length,
       variationsCount: updatedProduct.variations.length
     });
 

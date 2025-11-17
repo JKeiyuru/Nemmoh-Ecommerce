@@ -5,7 +5,7 @@ import { Card, CardContent, CardFooter } from "../ui/card";
 import { Button } from "../ui/button";
 import { categoryOptionsMap } from "@/config";
 import { Badge } from "../ui/badge";
-import { Heart, ShoppingBag } from "lucide-react";
+import { Heart, ShoppingBag, ChevronLeft, ChevronRight } from "lucide-react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import {
@@ -14,6 +14,7 @@ import {
   fetchWishlist,
 } from "@/store/shop/wishlist-slice";
 import { useToast } from "../ui/use-toast";
+import { useState, useEffect } from "react";
 
 function ShoppingProductTile({
   product,
@@ -29,6 +30,46 @@ function ShoppingProductTile({
   const wishlistItems = wishlistState?.items || [];
 
   const isWishlisted = wishlistItems.some((item) => item._id === product._id);
+
+  // NEW: Image slider state
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [isHovering, setIsHovering] = useState(false);
+
+  // Get all product images
+  const productImages = product?.images && product.images.length > 0 
+    ? product.images 
+    : product?.image 
+    ? [product.image]
+    : product?.variations && product.variations.length > 0
+    ? [product.variations[0].image]
+    : [];
+
+  const hasMultipleImages = productImages.length > 1;
+
+  // Auto-slide on hover
+  useEffect(() => {
+    let interval;
+    if (isHovering && hasMultipleImages) {
+      interval = setInterval(() => {
+        setCurrentImageIndex((prev) => (prev + 1) % productImages.length);
+      }, 1500); // Change image every 1.5 seconds when hovering
+    } else {
+      setCurrentImageIndex(0); // Reset to first image when not hovering
+    }
+    return () => clearInterval(interval);
+  }, [isHovering, productImages.length, hasMultipleImages]);
+
+  const handlePrevImage = (e) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? productImages.length - 1 : prev - 1
+    );
+  };
+
+  const handleNextImage = (e) => {
+    e.stopPropagation();
+    setCurrentImageIndex((prev) => (prev + 1) % productImages.length);
+  };
 
   const toggleWishlist = async (e) => {
     e.stopPropagation();
@@ -96,25 +137,77 @@ function ShoppingProductTile({
         />
       </button>
 
-      {/* Product Image Section */}
+      {/* Product Image Section with Slider */}
       <div
         onClick={() => handleGetProductDetails(product?._id)}
         className="relative cursor-pointer overflow-hidden"
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
       >
-        {/* Image container with zoom effect */}
+        {/* Image container */}
         <div className="relative h-[280px] md:h-[320px] overflow-hidden bg-gray-50">
-          <img
-            src={product?.image}
-            alt={product?.title}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
-          />
+          {productImages.length > 0 ? (
+            productImages.map((img, index) => (
+              <img
+                key={index}
+                src={img}
+                alt={`${product?.title} - ${index + 1}`}
+                className={`absolute inset-0 w-full h-full object-cover transition-all duration-700 ${
+                  index === currentImageIndex 
+                    ? "opacity-100 scale-100" 
+                    : "opacity-0 scale-105"
+                }`}
+              />
+            ))
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gray-200">
+              <span className="text-gray-400">No image</span>
+            </div>
+          )}
           
-          {/* Gradient overlay on hover */}
+          {/* Gradient overlay */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+
+          {/* Image navigation buttons - only show if multiple images */}
+          {hasMultipleImages && (
+            <>
+              <button
+                onClick={handlePrevImage}
+                className="absolute left-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white"
+              >
+                <ChevronLeft className="w-5 h-5 text-gray-700" />
+              </button>
+              <button
+                onClick={handleNextImage}
+                className="absolute right-2 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 hover:bg-white"
+              >
+                <ChevronRight className="w-5 h-5 text-gray-700" />
+              </button>
+
+              {/* Image indicators */}
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-10 flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                {productImages.map((_, index) => (
+                  <div
+                    key={index}
+                    className={`h-1 rounded-full transition-all duration-300 ${
+                      index === currentImageIndex 
+                        ? "w-6 bg-white" 
+                        : "w-1.5 bg-white/50"
+                    }`}
+                  />
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {/* Status badges */}
         <div className="absolute top-3 left-3 flex flex-col gap-2">
+          {hasMultipleImages && (
+            <Badge className="glass-effect border-0 text-xs font-light tracking-wide px-3 py-1">
+              <span className="text-gray-700">{productImages.length} photos</span>
+            </Badge>
+          )}
           {product?.totalStock === 0 ? (
             <Badge className="glass-effect border-0 text-xs font-light tracking-wide px-3 py-1">
               <span className="text-gray-700">Out Of Stock</span>

@@ -1,6 +1,7 @@
+/* eslint-disable no-unused-vars */
 /* eslint-disable react/jsx-key */
 /* eslint-disable react/prop-types */
-import { StarIcon, ChevronDown, ChevronUp, Heart } from "lucide-react";
+import { StarIcon, ChevronDown, ChevronUp, Heart, ChevronLeft, ChevronRight } from "lucide-react";
 import { Avatar, AvatarFallback } from "../ui/avatar";
 import { Button } from "../ui/button";
 import { Dialog, DialogContent } from "../ui/dialog";
@@ -21,6 +22,9 @@ function ProductDetailsDialog({ open, setOpen, productDetails }) {
   const [selectedVariation, setSelectedVariation] = useState(null);
   const [isDescriptionExpanded, setIsDescriptionExpanded] = useState(false);
   const [isWishlisted, setIsWishlisted] = useState(false);
+  
+  // NEW: Image slider state
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
 
   const dispatch = useDispatch();
   const { user } = useSelector((state) => state.auth);
@@ -28,50 +32,100 @@ function ProductDetailsDialog({ open, setOpen, productDetails }) {
   const { reviews } = useSelector((state) => state.shopReview);
   const { toast } = useToast();
 
-  // Handle image display logic
-  const displayedImage = selectedVariation?.image || productDetails?.image;
+  // Get all product images
+  const productImages = productDetails?.images && productDetails.images.length > 0
+    ? productDetails.images
+    : productDetails?.image
+    ? [productDetails.image]
+    : [];
+
+  const hasMultipleImages = productImages.length > 1;
+
+  // Handle image display logic with variations
+  const displayedImage = selectedVariation?.image || 
+    (productImages[currentImageIndex] || productImages[0]);
+  
   const displayedTitle = selectedVariation
     ? `${productDetails?.title} (${selectedVariation.label})`
     : productDetails?.title;
 
-  // Create array of all images for thumbnails
-  const getAllImages = () => {
-    if (!productDetails) return [];
+  // Create array of variation images for thumbnails
+  const getAllThumbnails = () => {
+    const thumbnails = [];
     
-    const images = [];
-    
-    // Add original image if no variation is selected, or if selected variation is different
-    if (!selectedVariation || selectedVariation.image !== productDetails.image) {
-      images.push({
-        image: productDetails.image,
-        label: "Original",
-        isOriginal: true
-      });
-    }
-    
-    // Add variations
-    if (productDetails.variations && productDetails.variations.length > 0) {
-      productDetails.variations.forEach(variation => {
-        // Don't add the currently selected variation to thumbnails
-        if (!selectedVariation || variation.image !== selectedVariation.image) {
-          images.push(variation);
+    // Add main product images (not currently displayed)
+    if (!selectedVariation) {
+      productImages.forEach((img, index) => {
+        if (index !== currentImageIndex) {
+          thumbnails.push({
+            image: img,
+            label: `View ${index + 1}`,
+            isProductImage: true,
+            index: index
+          });
         }
       });
     }
     
-    return images;
+    // Add variations
+    if (productDetails?.variations && productDetails.variations.length > 0) {
+      productDetails.variations.forEach(variation => {
+        if (!selectedVariation || variation.image !== selectedVariation.image) {
+          thumbnails.push({
+            ...variation,
+            isVariation: true
+          });
+        }
+      });
+    }
+    
+    return thumbnails;
   };
 
-  const thumbnailImages = getAllImages();
+  const thumbnails = getAllThumbnails();
 
   // Handle thumbnail click
-  const handleThumbnailClick = (imageData) => {
-    if (imageData.isOriginal) {
+  const handleThumbnailClick = (thumbnailData) => {
+    if (thumbnailData.isVariation) {
+      setSelectedVariation(thumbnailData);
+      setCurrentImageIndex(0); // Reset image index when switching to variation
+    } else if (thumbnailData.isProductImage) {
       setSelectedVariation(null);
-    } else {
-      setSelectedVariation(imageData);
+      setCurrentImageIndex(thumbnailData.index);
     }
   };
+
+  // Image navigation
+  const handlePrevImage = () => {
+    if (selectedVariation) return; // Don't navigate if showing variation
+    setCurrentImageIndex((prev) => 
+      prev === 0 ? productImages.length - 1 : prev - 1
+    );
+  };
+
+  const handleNextImage = () => {
+    if (selectedVariation) return; // Don't navigate if showing variation
+    setCurrentImageIndex((prev) => (prev + 1) % productImages.length);
+  };
+
+  // Auto-advance images
+  useEffect(() => {
+    if (!open || selectedVariation || !hasMultipleImages) return;
+    
+    const interval = setInterval(() => {
+      setCurrentImageIndex((prev) => (prev + 1) % productImages.length);
+    }, 3000); // Change image every 3 seconds
+
+    return () => clearInterval(interval);
+  }, [open, selectedVariation, productImages.length, hasMultipleImages]);
+
+  // Reset image index when dialog opens
+  useEffect(() => {
+    if (open) {
+      setCurrentImageIndex(0);
+      setSelectedVariation(null);
+    }
+  }, [open, productDetails]);
 
   // Truncate description for preview
   const getDescriptionPreview = (description, wordLimit = 20) => {
@@ -132,6 +186,7 @@ function ProductDetailsDialog({ open, setOpen, productDetails }) {
     setReviewMsg("");
     setSelectedVariation(null);
     setIsDescriptionExpanded(false);
+    setCurrentImageIndex(0);
   }
 
   function handleAddReview() {
@@ -167,26 +222,75 @@ function ProductDetailsDialog({ open, setOpen, productDetails }) {
   return (
     <Dialog open={open} onOpenChange={handleDialogClose}>
       <DialogContent className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-8 p-4 sm:p-6 lg:p-12 max-w-[95vw] sm:max-w-[90vw] lg:max-w-[80vw] xl:max-w-[70vw] max-h-[95vh] overflow-y-auto">
-        {/* Image Section */}
+        {/* Image Section with Slider */}
         <div className="relative overflow-hidden rounded-lg order-1">
-          <img
-            src={displayedImage}
-            alt={displayedTitle}
-            width={600}
-            height={600}
-            className="aspect-square w-full object-cover rounded-lg"
-          />
+          {/* Main Image Display */}
+          <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-gray-100">
+            <img
+              src={displayedImage}
+              alt={displayedTitle}
+              className="w-full h-full object-cover"
+            />
+            
+            {/* Image Counter Badge */}
+            {hasMultipleImages && !selectedVariation && (
+              <div className="absolute top-3 right-3 bg-black/70 text-white text-xs px-2 py-1 rounded-full">
+                {currentImageIndex + 1} / {productImages.length}
+              </div>
+            )}
+
+            {/* Navigation Arrows - only show for multiple product images */}
+            {hasMultipleImages && !selectedVariation && (
+              <>
+                <button
+                  onClick={handlePrevImage}
+                  className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors"
+                >
+                  <ChevronLeft className="w-6 h-6 text-gray-700" />
+                </button>
+                <button
+                  onClick={handleNextImage}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 rounded-full bg-white/80 backdrop-blur-sm flex items-center justify-center hover:bg-white transition-colors"
+                >
+                  <ChevronRight className="w-6 h-6 text-gray-700" />
+                </button>
+              </>
+            )}
+
+            {/* Image Indicators */}
+            {hasMultipleImages && !selectedVariation && (
+              <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-2">
+                {productImages.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setCurrentImageIndex(index)}
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      index === currentImageIndex 
+                        ? "w-8 bg-white" 
+                        : "w-2 bg-white/50 hover:bg-white/70"
+                    }`}
+                  />
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Thumbnail images */}
-          {thumbnailImages.length > 0 && (
+          {thumbnails.length > 0 && (
             <div className="flex gap-2 mt-3 flex-wrap justify-center lg:justify-start">
-              {thumbnailImages.map((imageData, index) => (
-                <img
-                  key={index}
-                  src={imageData.image}
-                  alt={imageData.label}
-                  className="w-12 h-12 sm:w-16 sm:h-16 object-cover cursor-pointer border rounded-md transition-all duration-200 border-gray-300 hover:border-primary"
-                  onClick={() => handleThumbnailClick(imageData)}
-                />
+              {thumbnails.map((thumb, index) => (
+                <div key={index} className="relative group">
+                  <img
+                    src={thumb.image}
+                    alt={thumb.label}
+                    className="w-12 h-12 sm:w-16 sm:h-16 object-cover cursor-pointer border-2 rounded-md transition-all duration-200 border-gray-300 hover:border-primary"
+                    onClick={() => handleThumbnailClick(thumb)}
+                  />
+                  {/* Tooltip */}
+                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 bg-black text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap z-10 pointer-events-none">
+                    {thumb.label}
+                  </div>
+                </div>
               ))}
             </div>
           )}
