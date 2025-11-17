@@ -1,3 +1,4 @@
+/* eslint-disable no-unused-vars */
 // client/src/pages/admin-view/products.jsx
 import ProductImageUpload from "@/components/admin-view/image-upload";
 import AdminProductTile from "@/components/admin-view/product-tile";
@@ -20,10 +21,13 @@ import {
 import { Fragment, useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import VariationUploader from "@/components/admin-view/variation-uploader";
+import MultiImageUpload from "@/components/admin-view/multi-image-upload";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const initialFormData = {
   image: null,
+  images: [], // NEW: Multiple images array
   title: "",
   description: "",
   category: "",
@@ -46,18 +50,6 @@ function AdminProducts() {
   const dispatch = useDispatch();
   const { toast } = useToast();
 
-  // Debug logging
-  useEffect(() => {
-    console.log("FormData updated:", {
-      ...formData,
-      variations: formData.variations?.map(v => ({
-        label: v.label,
-        imagePreview: v.image?.substring(0, 50) + "...",
-        hasId: !!v._id
-      }))
-    });
-  }, [formData]);
-
   function resetForm() {
     setFormData(initialFormData);
     setImageFile(null);
@@ -73,10 +65,23 @@ function AdminProducts() {
   function onSubmit(event) {
     event.preventDefault();
 
-    // Prepare the payload
+    // Prepare the images array
+    const imagesArray = formData.images || [];
+    
+    // If there's an uploaded image URL that's not in the images array, add it
+    if (uploadedImageUrl && !imagesArray.includes(uploadedImageUrl)) {
+      imagesArray.unshift(uploadedImageUrl);
+    }
+
+    // If there's a legacy single image and it's not in the array, add it
+    if (formData.image && !imagesArray.includes(formData.image)) {
+      imagesArray.unshift(formData.image);
+    }
+
     const payload = {
       ...formData,
-      image: uploadedImageUrl || formData.image || null,
+      image: imagesArray[0] || null, // Keep backward compatibility - first image as main
+      images: imagesArray, // NEW: Send all images
       price: Number(formData.price),
       salePrice: formData.salePrice ? Number(formData.salePrice) : 0,
       totalStock: Number(formData.totalStock),
@@ -84,16 +89,13 @@ function AdminProducts() {
       variations: formData.variations?.map(v => ({
         image: v.image,
         label: v.label
-        // Don't send _id for new variations, let MongoDB generate it
       })) || []
     };
 
     console.log("Submitting payload:", {
       ...payload,
-      variations: payload.variations.map(v => ({
-        label: v.label,
-        hasImage: !!v.image
-      }))
+      imagesCount: payload.images.length,
+      variationsCount: payload.variations.length
     });
 
     const action = currentEditedId 
@@ -101,15 +103,13 @@ function AdminProducts() {
       : dispatch(addNewProduct(payload));
 
     action.then((data) => {
-      console.log("Submit response:", data);
-      
       if (data?.payload?.success) {
         dispatch(fetchAllProducts());
         toast({ 
           title: currentEditedId 
             ? "Product updated successfully" 
             : "Product added successfully",
-          description: `Product "${payload.title}" has been ${currentEditedId ? 'updated' : 'added'} with ${payload.variations.length} variations.`
+          description: `Product "${payload.title}" has been ${currentEditedId ? 'updated' : 'added'} with ${payload.images.length} images.`
         });
         handleCloseDialog();
       } else {
@@ -161,23 +161,22 @@ function AdminProducts() {
   }
 
   function isFormValid() {
-    // Check required fields
     const requiredFields = ['title', 'category', 'price', 'totalStock'];
     const areRequiredFieldsFilled = requiredFields.every(field => {
       const value = formData[field];
       return value !== "" && value !== null && value !== undefined;
     });
 
-    // Check if there's at least one image (main image or variations)
-    const hasMainImage = uploadedImageUrl || formData.image;
-    const hasVariations = formData.variations?.length > 0;
-    const hasImage = hasMainImage || hasVariations;
+    // Check if there's at least one image
+    const hasImages = (formData.images && formData.images.length > 0) || 
+                      uploadedImageUrl || 
+                      formData.image ||
+                      (formData.variations && formData.variations.length > 0);
 
-    // Validate price values
     const priceValid = formData.price && !isNaN(Number(formData.price)) && Number(formData.price) >= 0;
     const stockValid = formData.totalStock && !isNaN(Number(formData.totalStock)) && Number(formData.totalStock) >= 0;
 
-    return areRequiredFieldsFilled && hasImage && priceValid && stockValid;
+    return areRequiredFieldsFilled && hasImages && priceValid && stockValid;
   }
 
   function handleEdit(productData) {
@@ -194,7 +193,6 @@ function AdminProducts() {
     setOpenCreateProductsDialog(true);
   }
 
-  // Fetch products on component mount
   useEffect(() => {
     dispatch(fetchAllProducts());
   }, [dispatch]);
@@ -207,7 +205,7 @@ function AdminProducts() {
         <div>
           <h1 className="text-3xl font-bold">Products</h1>
           <p className="text-gray-600 mt-1">
-            Manage your product inventory and variations
+            Manage your product inventory with multiple images
           </p>
         </div>
         <Button onClick={handleAddNewProduct} className="gap-2">
@@ -285,7 +283,7 @@ function AdminProducts() {
           }
         }}
       >
-        <SheetContent side="right" className="overflow-auto w-full sm:max-w-[600px]">
+        <SheetContent side="right" className="overflow-auto w-full sm:max-w-[700px]">
           <SheetHeader>
             <SheetTitle className="text-2xl">
               {isEditMode ? "Edit Product" : "Add New Product"}
@@ -298,33 +296,36 @@ function AdminProducts() {
           </SheetHeader>
 
           <div className="space-y-6 py-6">
-            {/* Main Product Image Upload */}
-            <div>
-              <h3 className="text-lg font-medium mb-3">Main Product Image</h3>
-              <ProductImageUpload
-                imageFile={imageFile}
-                setImageFile={setImageFile}
-                uploadedImageUrl={uploadedImageUrl}
-                setUploadedImageUrl={setUploadedImageUrl}
-                imageLoadingState={imageLoadingState}
-                setImageLoadingState={setImageLoadingState}
-                isEditMode={false} // Allow image upload in edit mode
-                isCustomStyling={true}
-              />
-              <p className="text-sm text-gray-600 mt-2">
-                This will be the main image shown for your product. You can also add variations below.
-              </p>
-            </div>
+            {/* Tabs for organizing upload sections */}
+            <Tabs defaultValue="images" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="images">Product Images</TabsTrigger>
+                <TabsTrigger value="variations">Variations</TabsTrigger>
+              </TabsList>
 
-            <Separator />
+              <TabsContent value="images" className="space-y-6 mt-6">
+                {/* NEW: Multiple Images Upload */}
+                <MultiImageUpload 
+                  formData={formData} 
+                  setFormData={setFormData} 
+                />
+                
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>💡 Pro tip:</strong> Upload multiple angles and views of your product. 
+                    The first image will be the main display image on product listings.
+                  </p>
+                </div>
+              </TabsContent>
 
-            {/* Product Variations */}
-            <div>
-              <VariationUploader 
-                formData={formData} 
-                setFormData={setFormData} 
-              />
-            </div>
+              <TabsContent value="variations" className="space-y-6 mt-6">
+                {/* Product Variations */}
+                <VariationUploader 
+                  formData={formData} 
+                  setFormData={setFormData} 
+                />
+              </TabsContent>
+            </Tabs>
 
             <Separator />
 
@@ -350,7 +351,7 @@ function AdminProducts() {
                   <li>• Category is required</li>
                   <li>• Price must be a valid number ≥ 0</li>
                   <li>• Stock must be a valid number ≥ 0</li>
-                  <li>• At least one image (main image or variation) is required</li>
+                  <li>• At least one image is required</li>
                 </ul>
               </div>
             )}
