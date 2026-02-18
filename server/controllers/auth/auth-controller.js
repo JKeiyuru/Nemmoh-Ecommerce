@@ -2,6 +2,31 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../../models/User");
+const { sendWelcomeEmail } = require("../common/email-controller");
+
+const signToken = (user) =>
+  jwt.sign(
+    { id: user._id, role: user.role, email: user.email, userName: user.userName },
+    process.env.JWT_SECRET || "CLIENT_SECRET_KEY",
+    { expiresIn: "7d" }
+  );
+
+const setCookieAndRespond = (res, user, statusCode = 200, extraData = {}) => {
+  const token = signToken(user);
+  res
+    .cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    })
+    .status(statusCode)
+    .json({
+      success: true,
+      user: { id: user._id, email: user.email, role: user.role, userName: user.userName },
+      ...extraData,
+    });
+};
 
 // Register (Traditional method)
 const registerUser = async (req, res) => {
@@ -9,10 +34,10 @@ const registerUser = async (req, res) => {
 
   try {
     // Check if user exists by email or Firebase UID
-    const existingUser = await User.findOne({ 
-      $or: [{ email }, ...(firebaseUid ? [{ firebaseUid }] : [])] 
+    const existingUser = await User.findOne({
+      $or: [{ email }, ...(firebaseUid ? [{ firebaseUid }] : [])],
     });
-    
+
     if (existingUser) {
       return res.status(409).json({
         success: false,
@@ -44,34 +69,13 @@ const registerUser = async (req, res) => {
     });
 
     await newUser.save();
-    
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: newUser._id,
-        role: newUser.role,
-        email: newUser.email,
-        userName: newUser.userName,
-      },
-      process.env.JWT_SECRET || "CLIENT_SECRET_KEY",
-      { expiresIn: "7d" }
+
+    // Welcome email (non-blocking)
+    sendWelcomeEmail(email, { customerName: userName }).catch(err =>
+      console.error("⚠️ Welcome email error:", err.message)
     );
 
-    res.cookie("token", token, { 
-      httpOnly: true, 
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    }).status(201).json({
-      success: true,
-      message: "Registration successful",
-      user: {
-        id: newUser._id,
-        email: newUser.email,
-        role: newUser.role,
-        userName: newUser.userName,
-      },
-    });
+    setCookieAndRespond(res, newUser, 201, { message: "Registration successful" });
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({
@@ -106,7 +110,7 @@ const loginUser = async (req, res) => {
           message: "This account was created with Google. Please use Google sign-in.",
         });
       }
-      
+
       const isMatch = await bcrypt.compare(password, user.password);
       if (!isMatch) {
         return res.status(401).json({
@@ -116,33 +120,7 @@ const loginUser = async (req, res) => {
       }
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: user._id,
-        role: user.role,
-        email: user.email,
-        userName: user.userName,
-      },
-      process.env.JWT_SECRET || "CLIENT_SECRET_KEY",
-      { expiresIn: "7d" }
-    );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    }).json({
-      success: true,
-      message: "Logged in successfully",
-      user: {
-        id: user._id,
-        email: user.email,
-        role: user.role,
-        userName: user.userName,
-      },
-    });
+    setCookieAndRespond(res, user, 200, { message: "Logged in successfully" });
   } catch (error) {
     console.error("Login error:", error);
     res.status(500).json({
@@ -170,7 +148,7 @@ const authMiddleware = async (req, res, next) => {
         const admin = require("firebase-admin");
         const idToken = authHeader.split(" ")[1];
         const decodedToken = await admin.auth().verifyIdToken(idToken);
-        
+
         const user = await User.findOne({ firebaseUid: decodedToken.uid });
         if (user) {
           req.user = {
@@ -196,7 +174,7 @@ const authMiddleware = async (req, res, next) => {
     }
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET || "CLIENT_SECRET_KEY");
-    
+
     // Verify user still exists
     const user = await User.findById(decoded.id);
     if (!user) {
@@ -212,11 +190,11 @@ const authMiddleware = async (req, res, next) => {
       email: user.email,
       userName: user.userName,
     };
-    
+
     next();
   } catch (error) {
     console.error("Auth middleware error:", error.message);
-    
+
     if (error.name === 'JsonWebTokenError') {
       return res.status(401).json({
         success: false,
@@ -228,7 +206,7 @@ const authMiddleware = async (req, res, next) => {
         message: "Authentication token expired. Please login again.",
       });
     }
-    
+
     res.status(401).json({
       success: false,
       message: "Authentication failed",

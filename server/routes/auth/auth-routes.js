@@ -1,17 +1,36 @@
+// server/routes/auth/auth-routes.js
+
 const express = require("express");
 const admin = require("firebase-admin");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs");
 const User = require("../../models/User");
 const {
   registerUser,
   loginUser,
   logoutUser,
 } = require("../../controllers/auth/auth-controller");
+const { sendWelcomeEmail } = require("../../controllers/common/email-controller");
 
 const router = express.Router();
 
-// Firebase Admin Middleware
+const JWT_SECRET = process.env.JWT_SECRET || "CLIENT_SECRET_KEY";
+
+const signToken = (user) =>
+  jwt.sign(
+    { id: user._id, role: user.role, email: user.email, userName: user.userName },
+    JWT_SECRET,
+    { expiresIn: "7d" }
+  );
+
+const setCookie = (res, token) =>
+  res.cookie("token", token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+  });
+
+// Firebase Admin Middleware with detailed logging
 const verifyFirebaseToken = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -25,7 +44,7 @@ const verifyFirebaseToken = async (req, res, next) => {
 
     const idToken = authHeader.split(" ")[1];
     
-    // Add more detailed logging for debugging
+    // Add detailed logging for debugging
     console.log('🔍 Verifying Firebase token...');
     console.log('Token length:', idToken.length);
     
@@ -56,16 +75,15 @@ const verifyFirebaseToken = async (req, res, next) => {
   }
 };
 
-// Traditional Registration Route (without Firebase)
+// Traditional auth routes
 router.post("/register", registerUser);
-
-// Traditional Login Route (without Firebase)
 router.post("/login", loginUser);
+router.post("/logout", logoutUser);
 
 // Firebase Registration Route
 router.post("/firebase-register", verifyFirebaseToken, async (req, res) => {
   try {
-    const { userName, email, firebaseUid } = req.body;
+    const { userName, firebaseUid } = req.body;
     const { uid, email: firebaseEmail } = req.firebaseUser;
     
     console.log('🔐 Firebase Registration - UID:', uid, 'Email:', firebaseEmail);
@@ -100,25 +118,14 @@ router.post("/firebase-register", verifyFirebaseToken, async (req, res) => {
 
     await newUser.save();
     console.log('✅ New user created:', newUser.email);
-    
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: newUser._id,
-        role: newUser.role,
-        email: newUser.email,
-        userName: newUser.userName,
-      },
-      process.env.JWT_SECRET || "CLIENT_SECRET_KEY",
-      { expiresIn: "7d" }
+
+    // Welcome email (non-blocking)
+    sendWelcomeEmail(firebaseEmail, { customerName: userName }).catch(err =>
+      console.error("⚠️ Welcome email error:", err.message)
     );
 
-    res.cookie("token", token, { 
-      httpOnly: true, 
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    }).status(201).json({
+    const token = signToken(newUser);
+    setCookie(res, token).status(201).json({
       success: true,
       message: "Registration successful",
       user: {
@@ -171,24 +178,8 @@ router.post("/firebase-login", verifyFirebaseToken, async (req, res) => {
       await user.save();
     }
 
-    // Generate JWT token
-    const token = jwt.sign(
-      {
-        id: user._id,
-        role: user.role,
-        email: user.email,
-        userName: user.userName,
-      },
-      process.env.JWT_SECRET || "CLIENT_SECRET_KEY",
-      { expiresIn: "7d" }
-    );
-
-    res.cookie("token", token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    }).json({
+    const token = signToken(user);
+    setCookie(res, token).json({
       success: true,
       message: "Logged in successfully",
       user: {
@@ -207,7 +198,7 @@ router.post("/firebase-login", verifyFirebaseToken, async (req, res) => {
   }
 });
 
-// Social Login Route (Google) - Updated with better error handling
+// Social Login Route (Google)
 router.post("/social-login", verifyFirebaseToken, async (req, res) => {
   try {
     const { uid, email, name } = req.firebaseUser;
@@ -222,6 +213,8 @@ router.post("/social-login", verifyFirebaseToken, async (req, res) => {
       user = await User.findOne({ email });
       console.log('🔍 User lookup by email result:', user ? 'Found existing user' : 'No user found');
     }
+
+    const isNewUser = !user;
 
     if (!user) {
       console.log('👤 Creating new user for social login');
@@ -268,25 +261,15 @@ router.post("/social-login", verifyFirebaseToken, async (req, res) => {
 
     console.log('✅ Social login successful for user:', user.email, 'Role:', user.role);
 
-    // Generate JWT token
-    const jwtToken = jwt.sign(
-      {
-        id: user._id,
-        role: user.role,
-        email: user.email,
-        userName: user.userName
-      },
-      process.env.JWT_SECRET || "CLIENT_SECRET_KEY",
-      { expiresIn: '7d' }
-    );
+    // Send welcome email for genuinely new users
+    if (isNewUser) {
+      sendWelcomeEmail(email, { customerName: user.userName }).catch(err =>
+        console.error("⚠️ Welcome email error:", err.message)
+      );
+    }
 
-    // Set cookies and respond
-    res.cookie('token', jwtToken, { 
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 7 * 24 * 60 * 60 * 1000 // 7 days
-    }).json({
+    const token = signToken(user);
+    setCookie(res, token).json({
       success: true,
       message: "Logged in successfully",
       user: {
@@ -320,10 +303,7 @@ router.post("/social-login", verifyFirebaseToken, async (req, res) => {
   }
 });
 
-// Logout Route
-router.post("/logout", logoutUser);
-
-// Authentication Check Route - Modified to work with both auth methods
+// Authentication Check Route
 router.get("/check-auth", async (req, res) => {
   try {
     console.log('🔍 Check auth request received');
@@ -367,7 +347,7 @@ router.get("/check-auth", async (req, res) => {
     }
 
     console.log('🎫 Trying JWT token verification...');
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || "CLIENT_SECRET_KEY");
+    const decoded = jwt.verify(token, JWT_SECRET);
     
     // Verify user still exists
     const user = await User.findById(decoded.id);

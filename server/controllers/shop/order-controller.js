@@ -1,318 +1,140 @@
 // server/controllers/shop/order-controller.js
-const paypal = require("../../helpers/paypal");
-const { createToken, stkPush } = require("../../helpers/mpesa");
-const { sendPendingVerificationEmail } = require("../common/email-controller");
+
+const {
+  sendOrderConfirmedEmail,
+  sendOrderDispatchedEmail,
+  sendOrderDeliveredEmail,
+} = require("../common/email-controller");
 const Order = require("../../models/Order");
 const Cart = require("../../models/Cart");
 const Product = require("../../models/Product");
 const User = require("../../models/User");
 
+// ─── Create a Cash-on-Delivery order ─────────────────────────────────────────
 const createOrder = async (req, res) => {
   try {
     const {
       userId,
-      cartItems,
-      addressInfo,
-      orderStatus,
-      paymentMethod,
-      paymentStatus,
-      totalAmount,
-      orderDate,
-      orderUpdateDate,
-      paymentId,
-      payerId,
       cartId,
-    } = req.body;
-
-    const create_payment_json = {
-      intent: "sale",
-      payer: {
-        payment_method: "paypal",
-      },
-      redirect_urls: {
-        return_url: `${process.env.CLIENT_URL}/shop/paypal-return`,
-        cancel_url: `${process.env.CLIENT_URL}/shop/paypal-cancel`,
-      },
-      transactions: [
-        {
-          item_list: {
-            items: cartItems.map((item) => ({
-              name: item.title,
-              sku: item.productId,
-              price: item.price.toFixed(2),
-              currency: "USD",
-              quantity: item.quantity,
-            })),
-          },
-          amount: {
-            currency: "USD",
-            total: totalAmount.toFixed(2),
-          },
-          description: "Kenya Magic Toy Shop Purchase",
-        },
-      ],
-    };
-
-    paypal.payment.create(create_payment_json, async (error, paymentInfo) => {
-      if (error) {
-        console.log(error);
-        return res.status(500).json({
-          success: false,
-          message: "Error while creating paypal payment",
-        });
-      } else {
-        const newlyCreatedOrder = new Order({
-          userId,
-          cartId,
-          cartItems,
-          addressInfo,
-          orderStatus,
-          paymentMethod,
-          paymentStatus,
-          totalAmount,
-          orderDate,
-          orderUpdateDate,
-          paymentId,
-          payerId,
-        });
-
-        await newlyCreatedOrder.save();
-
-        const approvalURL = paymentInfo.links.find(
-          (link) => link.rel === "approval_url"
-        ).href;
-
-        res.status(201).json({
-          success: true,
-          approvalURL,
-          orderId: newlyCreatedOrder._id,
-        });
-      }
-    });
-  } catch (e) {
-    console.log(e);
-    res.status(500).json({
-      success: false,
-      message: "Some error occured!",
-    });
-  }
-};
-
-// New: Create order with manual payment verification
-const createManualPaymentOrder = async (req, res) => {
-  try {
-    const {
-      userId,
       cartItems,
       addressInfo,
-      orderStatus,
-      paymentMethod,
-      paymentStatus,
       totalAmount,
       subtotalAmount,
       deliveryFee,
-      cartId,
     } = req.body;
 
-    console.log('📝 Creating manual payment order for user:', userId);
-
-    // Get user details for email
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
+    if (!userId || !cartItems || !cartItems.length) {
+      return res.status(400).json({ success: false, message: "Missing required order fields" });
     }
 
-    // Create the order
+    const user = await User.findById(userId);
+    if (!user) return res.status(404).json({ success: false, message: "User not found" });
+
     const newOrder = new Order({
       userId,
       cartId,
       cartItems,
       addressInfo,
-      orderStatus: "pending_verification",
-      paymentMethod: "manual_mpesa",
-      paymentStatus: "awaiting_verification",
+      orderStatus: "confirmed",
+      paymentMethod: "cash_on_delivery",
+      paymentStatus: "pending",
       totalAmount,
       subtotalAmount: subtotalAmount || totalAmount - (deliveryFee || 0),
       deliveryAmount: deliveryFee || 0,
       orderDate: new Date(),
       orderUpdateDate: new Date(),
-      paymentVerificationNote: "Awaiting manual payment verification",
     });
 
     await newOrder.save();
-    console.log('✅ Order created:', newOrder._id);
+    console.log("✅ COD order created:", newOrder._id);
 
-    // Send pending verification email
-    try {
-      const emailResult = await sendPendingVerificationEmail(user.email, {
-        orderId: newOrder._id,
-        totalAmount: newOrder.totalAmount,
-        customerName: user.userName,
-        orderItems: cartItems
-      });
-      
-      if (emailResult.success) {
-        console.log('✅ Pending verification email sent to:', user.email);
-      } else {
-        console.error('⚠️ Failed to send email:', emailResult.error);
-      }
-    } catch (emailError) {
-      console.error('⚠️ Email sending error:', emailError);
-      // Don't fail the order creation if email fails
-    }
+    // Send order confirmation email (non-blocking)
+    sendOrderConfirmedEmail(user.email, {
+      customerName: user.userName,
+      orderId: newOrder._id,
+      cartItems,
+      subtotalAmount: newOrder.subtotalAmount,
+      deliveryFee: newOrder.deliveryAmount,
+      totalAmount,
+      addressInfo,
+    }).catch(err => console.error("⚠️ Email error:", err.message));
 
     res.status(201).json({
       success: true,
-      message: "Order created successfully. Payment verification pending.",
+      message: "Order placed successfully!",
       orderId: newOrder._id,
       order: newOrder,
     });
-
-  } catch (error) {
-    console.error('❌ Error creating manual payment order:', error);
-    res.status(500).json({
-      success: false,
-      message: "Failed to create order",
-      error: error.message,
-    });
+  } catch (e) {
+    console.error("❌ createOrder error:", e);
+    res.status(500).json({ success: false, message: "Failed to create order" });
   }
 };
 
+// ─── Legacy: manual M-Pesa (kept, redirected to COD) ─────────────────────────
+const createManualPaymentOrder = createOrder;
+
+// ─── Capture PayPal (legacy — kept but not surfaced in UI) ───────────────────
 const capturePayment = async (req, res) => {
   try {
     const { paymentId, payerId, orderId } = req.body;
-
-    let order = await Order.findById(orderId);
-
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order can not be found",
-      });
-    }
+    const order = await Order.findById(orderId);
+    if (!order) return res.status(404).json({ success: false, message: "Order not found" });
 
     order.paymentStatus = "paid";
     order.orderStatus = "confirmed";
     order.paymentId = paymentId;
     order.payerId = payerId;
 
-    for (let item of order.cartItems) {
-      let product = await Product.findById(item.productId);
-
-      if (!product) {
-        return res.status(404).json({
-          success: false,
-          message: `Not enough stock for this product ${product.title}`,
-        });
-      }
-
-      product.totalStock -= item.quantity;
-      await product.save();
+    for (const item of order.cartItems) {
+      const product = await Product.findById(item.productId);
+      if (product) { product.totalStock -= item.quantity; await product.save(); }
     }
 
-    const getCartId = order.cartId;
-    await Cart.findByIdAndDelete(getCartId);
-
+    await Cart.findByIdAndDelete(order.cartId);
     await order.save();
 
-    res.status(200).json({
-      success: true,
-      message: "Order confirmed",
-      data: order,
-    });
+    res.status(200).json({ success: true, message: "Order confirmed", data: order });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
-      success: false,
-      message: "Some error occured!",
-    });
+    console.error(e);
+    res.status(500).json({ success: false, message: "Error capturing payment" });
   }
 };
 
-const initiateMpesaPayment = async (req, res) => {
-  const { phone, amount, callbackUrl } = req.body;
-
-  try {
-    const token = await createToken();
-    const stkResponse = await stkPush(token, phone, amount, callbackUrl);
-
-    const newOrder = new Order({
-      userId: req.body.userId,
-      cartItems: req.body.cartItems,
-      addressInfo: req.body.addressInfo,
-      paymentMethod: "mpesa",
-      paymentStatus: "pending",
-      totalAmount: amount,
-      orderDate: new Date(),
-      orderUpdateDate: new Date(),
-    });
-
-    await newOrder.save();
-
-    res.status(200).json({
-      success: true,
-      data: stkResponse,
-      orderId: newOrder._id,
-    });
-  } catch (error) {
-    console.error("M-Pesa payment error:", error.response?.data || error.message);
-    res.status(500).json({ success: false, message: "M-Pesa payment failed" });
-  }
-};
-
+// ─── Get all orders by user ───────────────────────────────────────────────────
 const getAllOrdersByUser = async (req, res) => {
   try {
     const { userId } = req.params;
-
     const orders = await Order.find({ userId }).sort({ orderDate: -1 });
 
     if (!orders.length) {
-      return res.status(404).json({
-        success: false,
-        message: "No orders found!",
-      });
+      return res.status(200).json({ success: true, data: [] });
     }
 
-    res.status(200).json({
-      success: true,
-      data: orders,
-    });
+    res.status(200).json({ success: true, data: orders });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
-      success: false,
-      message: "Some error occured!",
-    });
+    console.error(e);
+    res.status(500).json({ success: false, message: "Error fetching orders" });
   }
 };
 
+// ─── Get single order details ─────────────────────────────────────────────────
 const getOrderDetails = async (req, res) => {
   try {
     const { id } = req.params;
-
     const order = await Order.findById(id);
+    if (!order) return res.status(404).json({ success: false, message: "Order not found" });
 
-    if (!order) {
-      return res.status(404).json({
-        success: false,
-        message: "Order not found!",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: order,
-    });
+    res.status(200).json({ success: true, data: order });
   } catch (e) {
-    console.log(e);
-    res.status(500).json({
-      success: false,
-      message: "Some error occured!",
-    });
+    console.error(e);
+    res.status(500).json({ success: false, message: "Error fetching order" });
   }
+};
+
+// ─── M-Pesa STK stub (kept, not surfaced in UI) ───────────────────────────────
+const initiateMpesaPayment = async (req, res) => {
+  res.status(503).json({ success: false, message: "M-Pesa STK is not currently active. Please use Cash on Delivery." });
 };
 
 module.exports = {
