@@ -60,6 +60,7 @@ function AdminOrderDetailsView({ orderDetails }) {
   if (!orderDetails) return null;
 
   const isCOD = orderDetails.paymentMethod === "cash_on_delivery";
+  const isPaystack = orderDetails.paymentMethod === "paystack";
   const isPaid = orderDetails.paymentStatus === "paid";
 
   return (
@@ -77,12 +78,12 @@ function AdminOrderDetailsView({ orderDetails }) {
           </div>
           <div className="flex items-center justify-between">
             <p className="font-medium text-gray-500 text-sm">Payment Method</p>
-            <Label>{isCOD ? "💵 Cash on Delivery" : orderDetails.paymentMethod}</Label>
+            <Label>{isCOD ? "💵 Cash on Delivery" : isPaystack ? "💳 Paystack" : orderDetails.paymentMethod}</Label>
           </div>
           <div className="flex items-center justify-between">
             <p className="font-medium text-gray-500 text-sm">Payment Status</p>
             <Badge className={isPaid ? "bg-green-500" : "bg-amber-500"}>
-              {isPaid ? "✅ Paid" : "⏳ Pending (COD)"}
+              {isPaid ? "✅ Paid" : isCOD ? "⏳ Pending (COD)" : "⏳ Pending"}
             </Badge>
           </div>
           <div className="flex items-center justify-between">

@@ -11,11 +11,10 @@ const initialState = {
   orderId: null,
   orderList: [],
   orderDetails: null,
-  // Legacy — kept but not used in the new COD UI
-  approvalURL: null,
+  paystack: null, // { orderId, reference, authorizationUrl, accessCode, publicKey }
 };
 
-// ─── COD Order ────────────────────────────────────────────────────────────────
+// ─── Cash on Delivery ─────────────────────────────────────────────────────────
 export const createOrder = createAsyncThunk(
   "/order/createOrder",
   async (orderData, { rejectWithValue }) => {
@@ -28,15 +27,28 @@ export const createOrder = createAsyncThunk(
   }
 );
 
-// Legacy alias — points to same endpoint
-export const createManualPaymentOrder = createOrder;
+// ─── Paystack ─────────────────────────────────────────────────────────────────
+export const initiatePaystackPayment = createAsyncThunk(
+  "/order/initiatePaystackPayment",
+  async (orderData, { rejectWithValue }) => {
+    try {
+      const res = await axios.post(`${BASE}/paystack/initiate`, orderData);
+      return res.data;
+    } catch (e) {
+      return rejectWithValue(e.response?.data || { message: e.message });
+    }
+  }
+);
 
-// ─── PayPal (legacy — kept in codebase, not surfaced in UI) ──────────────────
-export const capturePayment = createAsyncThunk(
-  "/order/capturePayment",
-  async ({ paymentId, payerId, orderId }) => {
-    const res = await axios.post(`${BASE}/capture`, { paymentId, payerId, orderId });
-    return res.data;
+export const verifyPaystackPayment = createAsyncThunk(
+  "/order/verifyPaystackPayment",
+  async (reference, { rejectWithValue }) => {
+    try {
+      const res = await axios.post(`${BASE}/paystack/verify`, { reference });
+      return res.data;
+    } catch (e) {
+      return rejectWithValue(e.response?.data || { message: e.message });
+    }
   }
 );
 
@@ -63,6 +75,7 @@ const shoppingOrderSlice = createSlice({
   initialState,
   reducers: {
     resetOrderDetails: (state) => { state.orderDetails = null; },
+    resetPaystack: (state) => { state.paystack = null; },
   },
   extraReducers: (builder) => {
     builder
@@ -72,6 +85,20 @@ const shoppingOrderSlice = createSlice({
         state.orderId = action.payload.orderId;
       })
       .addCase(createOrder.rejected,   (state) => { state.isLoading = false; state.orderId = null; })
+
+      .addCase(initiatePaystackPayment.pending,   (state) => { state.isLoading = true; })
+      .addCase(initiatePaystackPayment.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.paystack = action.payload;
+      })
+      .addCase(initiatePaystackPayment.rejected,  (state) => { state.isLoading = false; })
+
+      .addCase(verifyPaystackPayment.pending,   (state) => { state.isLoading = true; })
+      .addCase(verifyPaystackPayment.fulfilled, (state, action) => {
+        state.isLoading = false;
+        state.orderId = action.payload.orderId;
+      })
+      .addCase(verifyPaystackPayment.rejected,  (state) => { state.isLoading = false; })
 
       .addCase(getAllOrdersByUserId.pending,   (state) => { state.isLoading = true; })
       .addCase(getAllOrdersByUserId.fulfilled, (state, action) => { state.isLoading = false; state.orderList = action.payload.data || []; })
@@ -83,5 +110,5 @@ const shoppingOrderSlice = createSlice({
   },
 });
 
-export const { resetOrderDetails } = shoppingOrderSlice.actions;
+export const { resetOrderDetails, resetPaystack } = shoppingOrderSlice.actions;
 export default shoppingOrderSlice.reducer;

@@ -247,6 +247,15 @@ function AuthLogin() {
         onSubmit={onSubmit}
         disabled={isLoading}
       />
+
+      <div className="text-right -mt-4">
+        <Link
+          to="/auth/forgot-password"
+          className="text-sm font-medium text-gray-600 hover:text-gray-900 hover:underline"
+        >
+          Forgot your password?
+        </Link>
+      </div>
       
       <div className="relative">
         <div className="absolute inset-0 flex items-center">

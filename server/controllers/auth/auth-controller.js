@@ -1,8 +1,11 @@
 // server/controllers/auth/auth-controller.js
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 const User = require("../../models/User");
-const { sendWelcomeEmail } = require("../common/email-controller");
+const { sendWelcomeEmail, sendPasswordResetEmail } = require("../common/email-controller");
+
+const CLIENT_URL = process.env.CLIENT_URL || "https://kenyamagictoyshop.com";
 
 const signToken = (user) =>
   jwt.sign(
@@ -130,6 +133,118 @@ const loginUser = async (req, res) => {
   }
 };
 
+// Forgot password — sends a branded reset email via Brevo.
+// Works for both Firebase-auth accounts (uses Firebase's reset link generator)
+// and traditional local-password accounts (uses our own signed token).
+const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  try {
+    if (!email) {
+      return res.status(400).json({ success: false, message: "Email is required" });
+    }
+
+    const user = await User.findOne({ email });
+
+    // Always respond with a generic success message so we don't leak
+    // which emails are registered.
+    const genericResponse = {
+      success: true,
+      message: "If an account exists with that email, a reset link has been sent.",
+    };
+
+    if (!user) {
+      return res.status(200).json(genericResponse);
+    }
+
+    if (user.firebaseUid) {
+      // Firebase-authenticated account — generate a Firebase reset link,
+      // but deliver it through our own branded Brevo email.
+      try {
+        const admin = require("firebase-admin");
+        const resetLink = await admin.auth().generatePasswordResetLink(email, {
+          url: `${CLIENT_URL}/auth/login`,
+        });
+
+        sendPasswordResetEmail(email, {
+          customerName: user.userName,
+          resetLink,
+        }).catch((err) => console.error("⚠️ Password reset email error:", err.message));
+      } catch (firebaseError) {
+        console.error("❌ Firebase reset link error:", firebaseError.message);
+      }
+
+      return res.status(200).json(genericResponse);
+    }
+
+    // Local (non-Firebase) account — issue our own signed, expiring token.
+    const rawToken = crypto.randomBytes(32).toString("hex");
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex");
+
+    user.resetPasswordTokenHash = tokenHash;
+    user.resetPasswordExpires = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+    await user.save();
+
+    const resetLink = `${CLIENT_URL}/auth/reset-password/${rawToken}?email=${encodeURIComponent(email)}`;
+
+    sendPasswordResetEmail(email, {
+      customerName: user.userName,
+      resetLink,
+    }).catch((err) => console.error("⚠️ Password reset email error:", err.message));
+
+    res.status(200).json(genericResponse);
+  } catch (error) {
+    console.error("Forgot password error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
+// Reset password — completes a local-account reset using the token emailed above.
+const resetPassword = async (req, res) => {
+  const { email, token, newPassword } = req.body;
+
+  try {
+    if (!email || !token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Email, token and new password are required",
+      });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Password must be at least 6 characters long",
+      });
+    }
+
+    const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+
+    const user = await User.findOne({
+      email,
+      resetPasswordTokenHash: tokenHash,
+      resetPasswordExpires: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "This reset link is invalid or has expired. Please request a new one.",
+      });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 12);
+    user.resetPasswordTokenHash = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    res.status(200).json({ success: true, message: "Password reset successfully. You can now log in." });
+  } catch (error) {
+    console.error("Reset password error:", error);
+    res.status(500).json({ success: false, message: "Internal server error" });
+  }
+};
+
 // Logout
 const logoutUser = (req, res) => {
   res.clearCookie("token").json({
@@ -214,4 +329,11 @@ const authMiddleware = async (req, res, next) => {
   }
 };
 
-module.exports = { registerUser, loginUser, logoutUser, authMiddleware };
+module.exports = {
+  registerUser,
+  loginUser,
+  logoutUser,
+  authMiddleware,
+  forgotPassword,
+  resetPassword,
+};

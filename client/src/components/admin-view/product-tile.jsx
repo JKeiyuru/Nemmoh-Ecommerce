@@ -74,15 +74,15 @@ function AdminProductTile({
           <img
             src={displayImage}
             alt={product?.title || "Product"}
-            className="w-full h-[300px] object-cover rounded-t-lg"
+            className="w-full h-[140px] sm:h-[220px] lg:h-[300px] object-cover rounded-t-lg"
             onError={(e) => {
               e.target.src = "/api/placeholder/300/300";
               e.target.alt = "Image not available";
             }}
           />
         ) : (
-          <div className="w-full h-[300px] bg-gray-200 rounded-t-lg flex items-center justify-center">
-            <span className="text-gray-500">No Image</span>
+          <div className="w-full h-[140px] sm:h-[220px] lg:h-[300px] bg-gray-200 rounded-t-lg flex items-center justify-center">
+            <span className="text-gray-500 text-xs sm:text-sm">No Image</span>
           </div>
         )}
         
@@ -90,10 +90,11 @@ function AdminProductTile({
         {hasMultipleImages && (
           <Badge 
             variant="secondary" 
-            className="absolute top-2 left-2 bg-blue-600/90 text-white hover:bg-blue-700 flex items-center gap-1"
+            className="absolute top-1.5 left-1.5 sm:top-2 sm:left-2 bg-blue-600/90 text-white hover:bg-blue-700 flex items-center gap-1 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2.5 sm:py-0.5"
           >
-            <Images className="w-3 h-3" />
-            {imageCount} photos
+            <Images className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+            <span className="hidden sm:inline">{imageCount} photos</span>
+            <span className="sm:hidden">{imageCount}</span>
           </Badge>
         )}
 
@@ -101,9 +102,9 @@ function AdminProductTile({
         {hasVariations && (
           <Badge 
             variant="secondary" 
-            className="absolute top-2 right-2 bg-black/70 text-white hover:bg-black/80"
+            className="absolute top-1.5 right-1.5 sm:top-2 sm:right-2 bg-black/70 text-white hover:bg-black/80 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2.5 sm:py-0.5"
           >
-            {variationCount} variation{variationCount > 1 ? 's' : ''}
+            {variationCount}<span className="hidden sm:inline"> variation{variationCount > 1 ? 's' : ''}</span>
           </Badge>
         )}
 
@@ -111,49 +112,49 @@ function AdminProductTile({
         {product?.salePrice > 0 && (
           <Badge 
             variant="destructive" 
-            className="absolute bottom-2 right-2"
+            className="absolute bottom-1.5 right-1.5 sm:bottom-2 sm:right-2 text-[10px] sm:text-xs px-1.5 py-0.5 sm:px-2.5 sm:py-0.5"
           >
             Sale
           </Badge>
         )}
       </div>
       
-      <CardContent className="p-4">
-        <h2 className="text-xl font-bold mb-2 line-clamp-2" title={product?.title}>
+      <CardContent className="p-2.5 sm:p-4">
+        <h2 className="text-sm sm:text-xl font-bold mb-1.5 sm:mb-2 line-clamp-2" title={product?.title}>
           {product?.title}
         </h2>
         
         {/* Price section */}
-        <div className="flex justify-between items-center mb-3">
-          <div className="flex items-center gap-2">
+        <div className="flex justify-between items-center mb-2 sm:mb-3 flex-wrap gap-1">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <span
-              className={`text-lg font-semibold ${
+              className={`text-sm sm:text-lg font-semibold ${
                 product?.salePrice > 0 ? "line-through text-gray-500" : "text-primary"
               }`}
             >
-              KES{product?.price}/
+              KES{product?.price}
             </span>
             {product?.salePrice > 0 && (
-              <span className="text-lg font-bold text-red-600">
-                {product?.salePrice}/
+              <span className="text-sm sm:text-lg font-bold text-red-600">
+                {product?.salePrice}
               </span>
             )}
           </div>
-          <div className="text-sm text-gray-600">
+          <div className="text-xs sm:text-sm text-gray-600">
             Stock: {product?.totalStock || 0}
           </div>
         </div>
 
         {/* Category */}
-        <div className="mb-3">
-          <Badge variant="outline" className="text-xs">
+        <div className="mb-2 sm:mb-3">
+          <Badge variant="outline" className="text-[10px] sm:text-xs">
             {product?.category}
           </Badge>
         </div>
         
-        {/* Images preview - NEW */}
+        {/* Images preview - collapsed on mobile to keep cards compact */}
         {hasMultipleImages && (
-          <div className="mb-3">
+          <div className="mb-3 hidden sm:block">
             <p className="text-sm font-medium text-gray-700 mb-2">Product Images:</p>
             <div className="flex flex-wrap gap-2">
               {product.images.slice(0, 4).map((img, index) => (
@@ -185,9 +186,9 @@ function AdminProductTile({
           </div>
         )}
 
-        {/* Variations preview */}
+        {/* Variations preview - collapsed on mobile to keep cards compact */}
         {hasVariations && (
-          <div className="mb-3">
+          <div className="mb-3 hidden sm:block">
             <p className="text-sm font-medium text-gray-700 mb-2">Variations:</p>
             <div className="flex flex-wrap gap-2">
               {product.variations.slice(0, 4).map((variation, index) => (
@@ -218,18 +219,18 @@ function AdminProductTile({
           </div>
         )}
 
-        {/* Product stats */}
-        <div className="flex justify-between items-center text-sm text-gray-600">
+        {/* Product stats - hidden on mobile to save space */}
+        <div className="hidden sm:flex justify-between items-center text-sm text-gray-600">
           <span>Rating: {product?.averageReview || 0}/5</span>
           <span>ID: {product?._id?.slice(-6) || 'N/A'}</span>
         </div>
       </CardContent>
       
-      <CardFooter className="p-4 pt-0">
-        <div className="flex gap-2 w-full">
+      <CardFooter className="p-2.5 sm:p-4 pt-0">
+        <div className="flex gap-1.5 sm:gap-2 w-full">
           <Button 
             onClick={handleEditClick} 
-            className="flex-1"
+            className="flex-1 h-8 sm:h-10 text-xs sm:text-sm px-2"
             variant="outline"
           >
             Edit
@@ -237,7 +238,7 @@ function AdminProductTile({
           <Button
             onClick={() => handleDelete(product._id)}
             variant="destructive"
-            className="flex-1"
+            className="flex-1 h-8 sm:h-10 text-xs sm:text-sm px-2"
           >
             Delete
           </Button>

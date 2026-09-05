@@ -68,28 +68,68 @@ function AdminOrdersView() {
     </TableRow>
   );
 
+  // Compact card used on small screens instead of a horizontally-scrolling table.
+  const OrderCard = ({ order }) => (
+    <div key={order._id} className="rounded-lg border border-gray-200 p-3.5 space-y-2.5 bg-white">
+      <div className="flex items-center justify-between">
+        <span className="font-mono text-xs text-gray-500">#{order._id?.slice(-8)}</span>
+        <span className="text-xs text-gray-400">{order.orderDate?.split("T")[0]}</span>
+      </div>
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <StatusBadge status={order.orderStatus} />
+        <Badge className={order.paymentStatus === "paid" ? "bg-green-500 text-white" : "bg-amber-500 text-white"}>
+          {order.paymentStatus === "paid" ? "✅ Paid" : "⏳ COD"}
+        </Badge>
+      </div>
+      <div className="flex items-center justify-between pt-1 border-t border-gray-100">
+        <span className="font-semibold text-gray-900">KSh {order.totalAmount}</span>
+        <Dialog
+          open={openDetailsDialog}
+          onOpenChange={() => { setOpenDetailsDialog(false); dispatch(resetOrderDetails()); }}
+        >
+          <Button onClick={() => dispatch(getOrderDetailsForAdmin(order._id))} size="sm" variant="outline">
+            <Eye className="w-3.5 h-3.5 mr-1" /> View
+          </Button>
+          <AdminOrderDetailsView orderDetails={orderDetails} />
+        </Dialog>
+      </div>
+    </div>
+  );
+
   const OrderTable = ({ orders, emptyMsg = "No orders" }) => (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Order ID</TableHead>
-          <TableHead>Date</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Payment</TableHead>
-          <TableHead>Total</TableHead>
-          <TableHead><span className="sr-only">Actions</span></TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
+    <>
+      {/* Card layout — mobile/tablet */}
+      <div className="sm:hidden space-y-3">
         {orders.length > 0
-          ? orders.map(o => <OrderRow key={o._id} order={o} />)
-          : (
+          ? orders.map(o => <OrderCard key={o._id} order={o} />)
+          : <p className="text-center py-8 text-gray-400 text-sm">{emptyMsg}</p>}
+      </div>
+
+      {/* Table layout — desktop */}
+      <div className="hidden sm:block overflow-x-auto">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-8 text-gray-400">{emptyMsg}</TableCell>
+              <TableHead>Order ID</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Payment</TableHead>
+              <TableHead>Total</TableHead>
+              <TableHead><span className="sr-only">Actions</span></TableHead>
             </TableRow>
-          )}
-      </TableBody>
-    </Table>
+          </TableHeader>
+          <TableBody>
+            {orders.length > 0
+              ? orders.map(o => <OrderRow key={o._id} order={o} />)
+              : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-8 text-gray-400">{emptyMsg}</TableCell>
+                </TableRow>
+              )}
+          </TableBody>
+        </Table>
+      </div>
+    </>
   );
 
   return (

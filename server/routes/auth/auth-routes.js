@@ -8,6 +8,8 @@ const {
   registerUser,
   loginUser,
   logoutUser,
+  forgotPassword,
+  resetPassword,
 } = require("../../controllers/auth/auth-controller");
 const { sendWelcomeEmail } = require("../../controllers/common/email-controller");
 
@@ -79,6 +81,8 @@ const verifyFirebaseToken = async (req, res, next) => {
 router.post("/register", registerUser);
 router.post("/login", loginUser);
 router.post("/logout", logoutUser);
+router.post("/forgot-password", forgotPassword);
+router.post("/reset-password", resetPassword);
 
 // Firebase Registration Route
 router.post("/firebase-register", verifyFirebaseToken, async (req, res) => {

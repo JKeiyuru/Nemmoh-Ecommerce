@@ -6,15 +6,35 @@ import img from "../../assets/account.jpg";
 import { useDispatch, useSelector } from "react-redux";
 import UserCartItemsContent from "@/components/shopping-view/cart-items-content";
 import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { createOrder } from "@/store/shop/order-slice";
+import { useState, useEffect, useCallback } from "react";
+import { createOrder, initiatePaystackPayment, verifyPaystackPayment } from "@/store/shop/order-slice";
 import { useToast } from "@/components/ui/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Truck, ShoppingCart, CheckCircle, MessageCircle, Phone, Package } from "lucide-react";
+import { Truck, ShoppingCart, CheckCircle, MessageCircle, Phone, Package, Banknote, CreditCard } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
 const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || "254799654321";
+const PAYSTACK_INLINE_SRC = "https://js.paystack.co/v1/inline.js";
+
+// Lazily loads the Paystack inline script once, and reuses it after that.
+function loadPaystackScript() {
+  return new Promise((resolve, reject) => {
+    if (window.PaystackPop) return resolve(window.PaystackPop);
+    const existing = document.querySelector(`script[src="${PAYSTACK_INLINE_SRC}"]`);
+    if (existing) {
+      existing.addEventListener("load", () => resolve(window.PaystackPop));
+      existing.addEventListener("error", reject);
+      return;
+    }
+    const script = document.createElement("script");
+    script.src = PAYSTACK_INLINE_SRC;
+    script.async = true;
+    script.onload = () => resolve(window.PaystackPop);
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
+}
 
 // ─── Step components ──────────────────────────────────────────────────────────
 function StepIndicator({ step }) {
@@ -45,8 +65,9 @@ function StepIndicator({ step }) {
 }
 
 // ─── Order Success screen ────────────────────────────────────────────────────
-function OrderSuccess({ orderId, totalAmount, phone }) {
+function OrderSuccess({ orderId, totalAmount, paymentMethod }) {
   const navigate = useNavigate();
+  const isPaystack = paymentMethod === "paystack";
   const whatsappMsg = encodeURIComponent(
     `Hi Kenya Magic Toy Shop! 👋 I just placed an order (ID: #${orderId}). Please confirm it. Thank you!`
   );
@@ -58,7 +79,11 @@ function OrderSuccess({ orderId, totalAmount, phone }) {
       </div>
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Order Placed! 🎉</h2>
-        <p className="text-gray-500 mt-1">Your order has been received and is being prepared.</p>
+        <p className="text-gray-500 mt-1">
+          {isPaystack
+            ? "Payment received — your order is being prepared."
+            : "Your order has been received and is being prepared."}
+        </p>
       </div>
 
       <Card className="text-left">
@@ -68,12 +93,12 @@ function OrderSuccess({ orderId, totalAmount, phone }) {
             <span className="font-mono font-semibold">#{String(orderId).slice(-8)}</span>
           </div>
           <div className="flex justify-between text-sm">
-            <span className="text-gray-500">Amount to Pay on Delivery</span>
+            <span className="text-gray-500">{isPaystack ? "Amount Paid" : "Amount to Pay on Delivery"}</span>
             <span className="font-bold text-green-700 text-base">KSh {Number(totalAmount).toFixed(2)}</span>
           </div>
           <div className="flex justify-between text-sm">
             <span className="text-gray-500">Payment</span>
-            <span className="font-medium">💵 Cash on Delivery</span>
+            <span className="font-medium">{isPaystack ? "💳 Paid via Paystack" : "💵 Cash on Delivery"}</span>
           </div>
         </CardContent>
       </Card>
@@ -120,6 +145,7 @@ function ShoppingCheckout() {
   const [currentSelectedAddress, setCurrentSelectedAddress] = useState(null);
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
   const [completedOrder, setCompletedOrder] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState("cod"); // 'cod' | 'paystack'
 
   const items = cartItems?.items || [];
 
@@ -188,39 +214,40 @@ function ShoppingCheckout() {
   );
 
   // ── Step 3: Order review & confirm ──────────────────────────────────────────
+  const buildOrderData = () => ({
+    userId: user?.id,
+    cartId: cartItems?._id,
+    cartItems: items.map(item => ({
+      productId: item.productId,
+      title: item.title,
+      image: item.image,
+      price: item.salePrice > 0 ? item.salePrice : item.price,
+      quantity: item.quantity,
+    })),
+    addressInfo: {
+      addressId: currentSelectedAddress._id,
+      county: currentSelectedAddress.county,
+      subCounty: currentSelectedAddress.subCounty,
+      location: currentSelectedAddress.location,
+      specificAddress: currentSelectedAddress.specificAddress,
+      phone: currentSelectedAddress.phone,
+      notes: currentSelectedAddress.notes,
+      deliveryFee: currentSelectedAddress.deliveryFee,
+      address: currentSelectedAddress.address,
+    },
+    subtotalAmount,
+    deliveryFee: currentSelectedAddress.deliveryFee,
+    totalAmount,
+    orderDate: new Date(),
+  });
+
   const handlePlaceOrder = async () => {
     if (!currentSelectedAddress) return toast({ title: "Please select a delivery address", variant: "destructive" });
     if (items.length === 0) return toast({ title: "Your cart is empty", variant: "destructive" });
 
     setIsPlacingOrder(true);
     try {
-      const orderData = {
-        userId: user?.id,
-        cartId: cartItems?._id,
-        cartItems: items.map(item => ({
-          productId: item.productId,
-          title: item.title,
-          image: item.image,
-          price: item.salePrice > 0 ? item.salePrice : item.price,
-          quantity: item.quantity,
-        })),
-        addressInfo: {
-          addressId: currentSelectedAddress._id,
-          county: currentSelectedAddress.county,
-          subCounty: currentSelectedAddress.subCounty,
-          location: currentSelectedAddress.location,
-          specificAddress: currentSelectedAddress.specificAddress,
-          phone: currentSelectedAddress.phone,
-          notes: currentSelectedAddress.notes,
-          deliveryFee: currentSelectedAddress.deliveryFee,
-          address: currentSelectedAddress.address,
-        },
-        subtotalAmount,
-        deliveryFee: currentSelectedAddress.deliveryFee,
-        totalAmount,
-        orderDate: new Date(),
-      };
-
+      const orderData = buildOrderData();
       const result = await dispatch(createOrder(orderData));
       if (result?.payload?.success) {
         setCompletedOrder(result.payload);
@@ -232,6 +259,57 @@ function ShoppingCheckout() {
       toast({ title: "Something went wrong. Please try again.", variant: "destructive" });
     } finally {
       setIsPlacingOrder(false);
+    }
+  };
+
+  const handlePayWithPaystack = async () => {
+    if (!currentSelectedAddress) return toast({ title: "Please select a delivery address", variant: "destructive" });
+    if (items.length === 0) return toast({ title: "Your cart is empty", variant: "destructive" });
+    if (!user?.email) return toast({ title: "We need your account email to process payment", variant: "destructive" });
+
+    setIsPlacingOrder(true);
+    try {
+      const orderData = buildOrderData();
+      const initResult = await dispatch(initiatePaystackPayment(orderData));
+      const initPayload = initResult?.payload;
+
+      if (!initPayload?.success) {
+        toast({ title: initPayload?.message || "Could not start payment", variant: "destructive" });
+        setIsPlacingOrder(false);
+        return;
+      }
+
+      const PaystackPop = await loadPaystackScript();
+      const handler = PaystackPop.setup({
+        key: initPayload.publicKey,
+        email: user.email,
+        amount: Math.round(totalAmount * 100),
+        currency: "KES",
+        ref: initPayload.reference,
+        onClose: () => {
+          setIsPlacingOrder(false);
+          toast({ title: "Payment window closed", description: "Your order was not charged." });
+        },
+        callback: (response) => {
+          dispatch(verifyPaystackPayment(response.reference)).then((verifyResult) => {
+            setIsPlacingOrder(false);
+            if (verifyResult?.payload?.success) {
+              setCompletedOrder({ orderId: initPayload.orderId });
+              setStep(4);
+            } else {
+              toast({
+                title: verifyResult?.payload?.message || "We couldn't confirm your payment",
+                description: "If you were charged, please contact us on WhatsApp.",
+                variant: "destructive",
+              });
+            }
+          });
+        },
+      });
+      handler.openIframe();
+    } catch (err) {
+      setIsPlacingOrder(false);
+      toast({ title: "Could not load the payment window", description: "Please try again.", variant: "destructive" });
     }
   };
 
@@ -285,20 +363,66 @@ function ShoppingCheckout() {
         </CardContent>
       </Card>
 
+      {/* Payment method selector */}
+      <Card>
+        <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-500 font-medium uppercase tracking-wide">Payment Method</CardTitle></CardHeader>
+        <CardContent className="pt-0 space-y-2">
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("cod")}
+            className={`w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
+              paymentMethod === "cod" ? "border-gray-900 bg-gray-50" : "border-gray-200"
+            }`}
+          >
+            <Banknote className={`w-5 h-5 ${paymentMethod === "cod" ? "text-gray-900" : "text-gray-400"}`} />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Cash on Delivery</p>
+              <p className="text-xs text-gray-500">Pay in cash when your order arrives</p>
+            </div>
+            {paymentMethod === "cod" && <CheckCircle className="w-5 h-5 text-green-600" />}
+          </button>
+          <button
+            type="button"
+            onClick={() => setPaymentMethod("paystack")}
+            className={`w-full flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
+              paymentMethod === "paystack" ? "border-gray-900 bg-gray-50" : "border-gray-200"
+            }`}
+          >
+            <CreditCard className={`w-5 h-5 ${paymentMethod === "paystack" ? "text-gray-900" : "text-gray-400"}`} />
+            <div className="flex-1">
+              <p className="text-sm font-semibold">Pay Now with Paystack</p>
+              <p className="text-xs text-gray-500">Card, M-Pesa or bank — secured by Paystack</p>
+            </div>
+            {paymentMethod === "paystack" && <CheckCircle className="w-5 h-5 text-green-600" />}
+          </button>
+        </CardContent>
+      </Card>
+
       {/* Payment note */}
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
-        <p className="font-semibold">💵 Cash on Delivery</p>
-        <p className="mt-1">Please have <strong>KSh {totalAmount.toFixed(2)}</strong> in cash ready when our delivery agent arrives.</p>
-      </div>
+      {paymentMethod === "cod" ? (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-800">
+          <p className="font-semibold">💵 Cash on Delivery</p>
+          <p className="mt-1">Please have <strong>KSh {totalAmount.toFixed(2)}</strong> in cash ready when our delivery agent arrives.</p>
+        </div>
+      ) : (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-sm text-blue-800">
+          <p className="font-semibold">💳 Secure Online Payment</p>
+          <p className="mt-1">You&apos;ll be prompted to pay <strong>KSh {totalAmount.toFixed(2)}</strong> via Paystack&apos;s secure checkout.</p>
+        </div>
+      )}
 
       <div className="flex gap-2">
         <Button variant="outline" className="flex-1" onClick={() => setStep(2)} disabled={isPlacingOrder}>← Back</Button>
         <Button
           className="flex-1 h-12 text-base bg-gray-900 hover:bg-gray-800"
-          onClick={handlePlaceOrder}
+          onClick={paymentMethod === "paystack" ? handlePayWithPaystack : handlePlaceOrder}
           disabled={isPlacingOrder}
         >
-          {isPlacingOrder ? "Placing Order…" : "✅ Place Order"}
+          {isPlacingOrder
+            ? "Processing…"
+            : paymentMethod === "paystack"
+            ? "💳 Pay Now"
+            : "✅ Place Order"}
         </Button>
       </div>
     </div>
@@ -323,7 +447,7 @@ function ShoppingCheckout() {
           <OrderSuccess
             orderId={completedOrder?.orderId || completedOrder?.order?._id}
             totalAmount={totalAmount}
-            phone={currentSelectedAddress?.phone}
+            paymentMethod={paymentMethod}
           />
         )}
       </div>

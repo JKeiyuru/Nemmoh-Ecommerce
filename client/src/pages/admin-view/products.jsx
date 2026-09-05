@@ -201,21 +201,21 @@ function AdminProducts() {
 
   return (
     <Fragment>
-      <div className="mb-5 w-full flex justify-between items-center">
+      <div className="mb-5 w-full flex flex-col sm:flex-row justify-between sm:items-center gap-3">
         <div>
-          <h1 className="text-3xl font-bold">Products</h1>
-          <p className="text-gray-600 mt-1">
+          <h1 className="text-2xl sm:text-3xl font-bold">Products</h1>
+          <p className="text-sm sm:text-base text-gray-600 mt-1">
             Manage your product inventory with multiple images
           </p>
         </div>
-        <Button onClick={handleAddNewProduct} className="gap-2">
+        <Button onClick={handleAddNewProduct} className="gap-2 w-full sm:w-auto">
           <span>+</span>
           Add New Product
         </Button>
       </div>
 
       {isLoading ? (
-        <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 lg:grid-cols-4">
           {[...Array(8)].map((_, index) => (
             <div key={index} className="w-full max-w-sm mx-auto">
               <div className="animate-pulse">
@@ -233,7 +233,7 @@ function AdminProducts() {
           ))}
         </div>
       ) : productList && productList.length > 0 ? (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {productList.map((productItem) => (
             <AdminProductTile
               key={productItem._id}

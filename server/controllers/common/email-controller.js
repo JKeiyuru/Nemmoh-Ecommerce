@@ -1,29 +1,18 @@
 // server/controllers/common/email-controller.js
 
-const nodemailer = require("nodemailer");
+const axios = require("axios");
 
 const SHOP_NAME = "Kenya Magic Toy Shop";
 const SHOP_PHONE = "0799 654 321";
-const SHOP_EMAIL = process.env.EMAIL_USER || "info@kenyamagictoyshop.com";
+const SHOP_EMAIL = process.env.BREVO_SENDER_EMAIL || "info@kenyamagictoyshop.com";
+const SHOP_SENDER_NAME = process.env.BREVO_SENDER_NAME || SHOP_NAME;
 const SHOP_LOCATION = "Nairobi CBD, Kenya";
 const WHATSAPP_NUMBER = process.env.WHATSAPP_NUMBER || "254799654321";
 const SHOP_HOURS = "Mon–Sat 8 AM – 7 PM, Sun 10 AM – 5 PM";
+const CLIENT_URL = process.env.CLIENT_URL || "https://kenyamagictoyshop.com";
 
-// Updated transporter for cPanel email hosting
-const createTransporter = () => {
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST,       // mail.kenyamagictoyshop.com
-    port: parseInt(process.env.EMAIL_PORT) || 465,
-    secure: process.env.EMAIL_SECURE === "true",  // true for port 465
-    auth: {
-      user: process.env.EMAIL_USER,     // info@kenyamagictoyshop.com
-      pass: process.env.EMAIL_PASSWORD, // cPanel email password
-    },
-    tls: {
-      rejectUnauthorized: false, // Avoids self-signed cert errors on shared hosting
-    },
-  });
-};
+// Brevo (formerly Sendinblue) transactional email HTTP API
+const BREVO_API_URL = "https://api.brevo.com/v3/smtp/email";
 
 // ─── Shared styles ────────────────────────────────────────────────────────────
 const baseStyles = `
@@ -297,27 +286,68 @@ const getOrderDeliveredEmail = ({ customerName, orderId, totalAmount, cartItems 
 </body></html>`;
 };
 
+// ─── Password reset email ──────────────────────────────────────────────────────
+const getPasswordResetEmail = ({ customerName, resetLink }) => `
+<!DOCTYPE html><html><head><style>${baseStyles}</style></head><body>
+<div class="wrap">
+  <div class="header" style="background:linear-gradient(135deg,#4527a0,#5e35b1)">
+    <div class="logo-badge" style="border-color:#d1c4e9;color:#d1c4e9">🔒 Password Reset</div>
+    <h1>Reset Your Password</h1>
+    <p>We received a request to reset your password.</p>
+  </div>
+  <div class="body">
+    <p class="greeting">Hi ${customerName || "there"},</p>
+    <p>Someone requested a password reset for your ${SHOP_NAME} account. If this was you, click the button below to choose a new password. This link will expire in <strong>1 hour</strong>.</p>
+
+    <div style="text-align:center;margin:28px 0">
+      <a href="${resetLink}" class="btn btn-dark">🔑 Reset My Password</a>
+    </div>
+
+    <div class="warning-box">
+      <strong>⚠️ Didn't request this?</strong><br>
+      If you didn't ask to reset your password, you can safely ignore this email — your password will remain unchanged.
+    </div>
+
+    <div class="divider"></div>
+    <p style="font-size:12px;color:#999;word-break:break-all">If the button doesn't work, copy and paste this link into your browser:<br>${resetLink}</p>
+  </div>
+  <div class="footer">
+    <p>${SHOP_NAME} | ${SHOP_LOCATION} | ${SHOP_PHONE}</p>
+    <p><a href="mailto:${SHOP_EMAIL}">${SHOP_EMAIL}</a></p>
+  </div>
+</div>
+</body></html>`;
+
 // ─── Senders ──────────────────────────────────────────────────────────────────
 
 const sendEmail = async ({ to, subject, html }) => {
-  if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD || !process.env.EMAIL_HOST) {
-    console.warn("⚠️  Email credentials not fully configured — skipping email to:", to);
-    console.warn("Required env vars: EMAIL_USER, EMAIL_PASSWORD, EMAIL_HOST");
-    return { success: false, error: "Email credentials not fully configured" };
+  if (!process.env.BREVO_API_KEY) {
+    console.warn("⚠️  BREVO_API_KEY not configured — skipping email to:", to);
+    return { success: false, error: "Brevo API key not configured" };
   }
   try {
-    const transporter = createTransporter();
-    const info = await transporter.sendMail({
-      from: `"${SHOP_NAME}" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
-    });
-    console.log(`✅ Email sent to ${to} — messageId: ${info.messageId}`);
-    return { success: true, messageId: info.messageId };
+    const response = await axios.post(
+      BREVO_API_URL,
+      {
+        sender: { name: SHOP_SENDER_NAME, email: SHOP_EMAIL },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      },
+      {
+        headers: {
+          "api-key": process.env.BREVO_API_KEY,
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+      }
+    );
+    console.log(`✅ Email sent to ${to} — messageId: ${response.data?.messageId}`);
+    return { success: true, messageId: response.data?.messageId };
   } catch (error) {
-    console.error("❌ Email error:", error.message);
-    return { success: false, error: error.message };
+    const errMsg = error.response?.data?.message || error.message;
+    console.error("❌ Brevo email error:", errMsg);
+    return { success: false, error: errMsg };
   }
 };
 
@@ -349,6 +379,13 @@ const sendOrderDeliveredEmail = (email, details) =>
     html: getOrderDeliveredEmail(details),
   });
 
+const sendPasswordResetEmail = (email, { customerName, resetLink }) =>
+  sendEmail({
+    to: email,
+    subject: `Reset your ${SHOP_NAME} password 🔒`,
+    html: getPasswordResetEmail({ customerName, resetLink }),
+  });
+
 // Legacy aliases (kept for backward compatibility)
 const sendPendingVerificationEmail = sendOrderConfirmedEmail;
 const sendPaymentVerifiedEmail = (email, details) =>
@@ -363,6 +400,7 @@ module.exports = {
   sendOrderConfirmedEmail,
   sendOrderDispatchedEmail,
   sendOrderDeliveredEmail,
+  sendPasswordResetEmail,
   // Legacy
   sendPendingVerificationEmail,
   sendPaymentVerifiedEmail,

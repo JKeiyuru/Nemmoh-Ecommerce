@@ -3,19 +3,17 @@ const express = require("express");
 
 const {
   createOrder,
-  createManualPaymentOrder,
+  initiatePaystackPayment,
+  verifyPaystackPayment,
   getAllOrdersByUser,
   getOrderDetails,
-  capturePayment,
-  initiateMpesaPayment,
 } = require("../../controllers/shop/order-controller");
 
 const router = express.Router();
 
 router.post("/create", createOrder);
-router.post("/create-manual", createManualPaymentOrder);
-router.post("/capture", capturePayment);
-router.post("/mpesa-payment", initiateMpesaPayment);
+router.post("/paystack/initiate", initiatePaystackPayment);
+router.post("/paystack/verify", verifyPaystackPayment);
 router.get("/list/:userId", getAllOrdersByUser);
 router.get("/details/:id", getOrderDetails);
 

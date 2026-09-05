@@ -107,16 +107,16 @@ function AdminDashboard() {
   return (
     <div className="space-y-6">
       <div className="mb-6">
-        <h1 className="text-3xl font-bold mb-2">Hero Images Manager</h1>
-        <p className="text-gray-600">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-2">Hero Images Manager</h1>
+        <p className="text-sm sm:text-base text-gray-600">
           Upload and manage the hero images that appear on your homepage carousel.
         </p>
       </div>
 
       {/* Upload Section */}
       <Card>
-        <CardContent className="pt-6">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+        <CardContent className="pt-6 px-3 sm:px-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
             <Plus className="w-5 h-5" />
             Add New Hero Image
           </h2>
@@ -141,8 +141,8 @@ function AdminDashboard() {
 
       {/* Current Hero Images */}
       <Card>
-        <CardContent className="pt-6">
-          <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
+        <CardContent className="pt-6 px-3 sm:px-6">
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 flex items-center gap-2">
             <ImageIcon className="w-5 h-5" />
             Current Hero Images ({featureImageList?.length || 0})
           </h2>
@@ -156,7 +156,7 @@ function AdminDashboard() {
                 >
                   <img
                     src={featureImgItem.image}
-                    className="w-full h-[250px] object-cover"
+                    className="w-full h-[180px] sm:h-[250px] object-cover"
                     alt={`Hero image ${index + 1}`}
                     onError={(e) => {
                       e.target.src = "/api/placeholder/400/250";
@@ -164,21 +164,17 @@ function AdminDashboard() {
                     }}
                   />
                   
-                  {/* Overlay with delete button */}
-                  <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center">
-                    <Button
-                      variant="destructive"
-                      size="lg"
-                      className="opacity-0 group-hover:opacity-100 transform scale-90 group-hover:scale-100 transition-all duration-200"
-                      onClick={() => handleDeleteClick(featureImgItem._id, featureImgItem.image)}
-                    >
-                      <Trash2 className="w-5 h-5 mr-2" />
-                      Delete Image
-                    </Button>
-                  </div>
+                  {/* Delete button — always visible on mobile (no hover on touch), overlay reveal on desktop */}
+                  <button
+                    onClick={() => handleDeleteClick(featureImgItem._id, featureImgItem.image)}
+                    className="absolute top-2 right-2 sm:top-1/2 sm:right-1/2 sm:translate-x-1/2 sm:-translate-y-1/2 sm:opacity-0 sm:group-hover:opacity-100 w-8 h-8 sm:w-auto sm:h-auto sm:px-4 sm:py-2 rounded-full sm:rounded-md bg-red-600 hover:bg-red-700 text-white flex items-center justify-center gap-2 transition-all duration-200 shadow-lg"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span className="hidden sm:inline text-sm font-medium">Delete Image</span>
+                  </button>
 
                   {/* Image number badge */}
-                  <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white px-3 py-1 rounded-full text-sm font-semibold">
+                  <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white px-2.5 py-0.5 sm:px-3 sm:py-1 rounded-full text-xs sm:text-sm font-semibold">
                     #{index + 1}
                   </div>
                 </div>
