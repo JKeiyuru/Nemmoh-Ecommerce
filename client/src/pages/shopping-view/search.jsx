@@ -12,6 +12,7 @@ import {
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useSearchParams, useNavigate } from "react-router-dom";
+import { useAddToCart } from "@/hooks/use-add-to-cart";
 
 function SearchProducts() {
   const [keyword, setKeyword] = useState("");
@@ -19,6 +20,7 @@ function SearchProducts() {
   const [searchParams, setSearchParams] = useSearchParams();
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const addItemToCart = useAddToCart();
   const { searchResults } = useSelector((state) => state.shopSearch);
   const { productDetails } = useSelector((state) => state.shopProducts);
   const { user, isAuthenticated } = useSelector((state) => state.auth);
@@ -37,50 +39,8 @@ function SearchProducts() {
     }
   }, [keyword]);
 
-  function handleAddtoCart(getCurrentProductId, getTotalStock) {
-    if (!isAuthenticated || !user) {
-      toast({
-        title: "Please login to add items to cart.",
-        description: "You'll be redirected to the login page.",
-        variant: "default",
-      });
-      setTimeout(() => navigate("/auth/login"), 1500);
-      return;
-    }
-
-    console.log(cartItems);
-    let getCartItems = cartItems.items || [];
-
-    if (getCartItems.length) {
-      const indexOfCurrentItem = getCartItems.findIndex(
-        (item) => item.productId === getCurrentProductId
-      );
-      if (indexOfCurrentItem > -1) {
-        const getQuantity = getCartItems[indexOfCurrentItem].quantity;
-        if (getQuantity + 1 > getTotalStock) {
-          toast({
-            title: `Only ${getQuantity} quantity can be added for this item`,
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-    }
-
-    dispatch(
-      addToCart({
-        userId: user?.id,
-        productId: getCurrentProductId,
-        quantity: 1,
-      })
-    ).then((data) => {
-      if (data?.payload?.success) {
-        dispatch(fetchCartItems(user?.id));
-        toast({
-          title: "Product is added to cart",
-        });
-      }
-    });
+  function handleAddtoCart(getCurrentProductId, getTotalStock, productOverride) {
+    addItemToCart(getCurrentProductId, 1, productOverride);
   }
 
   function handleGetProductDetails(getCurrentProductId) {

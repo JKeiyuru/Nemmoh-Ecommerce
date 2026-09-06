@@ -22,7 +22,7 @@ import ShoppingAccount from "./pages/shopping-view/account";
 import CheckAuth from "./components/common/check-auth";
 import UnauthPage from "./pages/unauth-page";
 import { useDispatch, useSelector } from "react-redux";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import {
   checkAuth,
   setFirebaseUser,
@@ -35,12 +35,25 @@ import SearchProducts from "./pages/shopping-view/search";
 import { auth } from "./firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import SpectacularLoader from "./components/common/spectacular-loader";
+import { mergeGuestCartOnLogin } from "./store/shop/cart-slice";
 
 function App() {
   const { user, isAuthenticated, isLoading } = useSelector((state) => state.auth);
   const dispatch = useDispatch();
   const [firebaseInitialized, setFirebaseInitialized] = useState(false);
   const [initialLoadComplete, setInitialLoadComplete] = useState(false);
+  const wasAuthenticated = useRef(false);
+
+  // Whenever the user transitions from logged-out to logged-in — no matter
+  // which route or method got them there (login, register, Google popup) —
+  // fold any items they added to their cart as a guest into their real,
+  // server-backed cart exactly once.
+  useEffect(() => {
+    if (isAuthenticated && user?.id && !wasAuthenticated.current) {
+      dispatch(mergeGuestCartOnLogin(user.id));
+    }
+    wasAuthenticated.current = isAuthenticated;
+  }, [isAuthenticated, user?.id, dispatch]);
 
   useEffect(() => {
     let mounted = true;

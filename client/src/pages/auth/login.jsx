@@ -6,10 +6,11 @@ import { loginFormControls } from "@/config";
 import { loginUser, syncFirebaseAuth } from "@/store/auth-slice";
 import { useState, useEffect } from "react";
 import { useDispatch, useSelector } from "react-redux";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/firebase";
 import { AuthProviders } from "@/components/auth/auth-providers";
+import { Loader2 } from "lucide-react";
 
 const initialState = {
   email: "",
@@ -22,163 +23,95 @@ function AuthLogin() {
   const dispatch = useDispatch();
   const { toast } = useToast();
   const navigate = useNavigate();
+  const location = useLocation();
   const { isAuthenticated, user } = useSelector((state) => state.auth);
 
-  // Navigate when user becomes authenticated
+  // Once Redux confirms the user is authenticated (regardless of which path
+  // got them there — email/password, Firebase, or Google), navigate them
+  // onward: back to whatever protected page they were trying to reach (e.g.
+  // checkout), or to their role's home otherwise. Guest-cart merging is
+  // handled globally in App.jsx.
   useEffect(() => {
     if (isAuthenticated && user) {
-      const targetRoute = user.role === 'admin' ? '/admin/dashboard' : '/shop/home';
-      console.log('🎯 Navigation triggered - User role:', user.role, '-> Route:', targetRoute);
-      navigate(targetRoute, { replace: true });
+      const redirectTo =
+        location.state?.from?.pathname ||
+        (user.role === "admin" ? "/admin/dashboard" : "/shop/home");
+      navigate(redirectTo, { replace: true });
     }
-  }, [isAuthenticated, user, navigate]);
+  }, [isAuthenticated, user, navigate, location.state]);
 
-  // Helper function to handle successful login navigation
-  const handleSuccessfulLogin = (userData, message = "Logged in successfully!") => {
-    toast({ title: message });
-    console.log('✅ Login successful for user:', {
-      email: userData.email || userData.userName,
-      role: userData.role
-    });
-  };
-
-  // Helper function to manually sync Firebase user with backend
-  const syncFirebaseUserWithBackend = async (firebaseUser) => {
-    try {
-      console.log('🔄 Manual sync - Getting fresh Firebase token...');
-      const idToken = await firebaseUser.getIdToken(true); // Force refresh
-      console.log('🎫 Got fresh Firebase token, length:', idToken.length);
-
-      // Try firebase-login first (for existing users)
-      console.log('🔐 Trying firebase-login endpoint...');
-      const loginResponse = await fetch('/api/auth/firebase-login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
-          email: firebaseUser.email,
-          firebaseUid: firebaseUser.uid
-        })
-      });
-
-      const loginData = await loginResponse.json();
-      console.log('🔐 Firebase login response:', loginData);
-
-      if (loginData.success) {
-        // Dispatch to Redux to update auth state
-        dispatch({
-          type: 'auth/setUser',
-          payload: {
-            isAuthenticated: true,
-            user: loginData.user
-          }
-        });
-        return loginData;
-      } else if (loginResponse.status === 404) {
-        // User doesn't exist, try social-login to create account
-        console.log('👤 User not found, trying social-login...');
-        const socialResponse = await fetch('/api/auth/social-login', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${idToken}`
-          }
-        });
-
-        const socialData = await socialResponse.json();
-        console.log('🎉 Social login response:', socialData);
-
-        if (socialData.success) {
-          // Dispatch to Redux to update auth state
-          dispatch({
-            type: 'auth/setUser',
-            payload: {
-              isAuthenticated: true,
-              user: socialData.user
-            }
-          });
-          return socialData;
-        } else {
-          throw new Error(socialData.message || 'Social login failed');
-        }
-      } else {
-        throw new Error(loginData.message || 'Firebase login failed');
-      }
-    } catch (error) {
-      console.error('❌ Manual sync error:', error);
-      throw error;
+  function friendlyFirebaseError(firebaseError) {
+    switch (firebaseError.code) {
+      case "auth/user-not-found":
+        return null; // Not a Firebase account — try traditional login instead.
+      case "auth/wrong-password":
+      case "auth/invalid-credential":
+        return "Incorrect email or password.";
+      case "auth/invalid-email":
+        return "That doesn't look like a valid email address.";
+      case "auth/user-disabled":
+        return "This account has been disabled. Please contact support.";
+      case "auth/too-many-requests":
+        return "Too many attempts. Please wait a moment and try again.";
+      default:
+        return null;
     }
-  };
+  }
 
   async function onSubmit(event) {
     event.preventDefault();
     setIsLoading(true);
 
     try {
-      console.log('🔐 Starting Firebase authentication...');
-      
-      // Firebase authentication
+      // Try Firebase first — most accounts are Firebase-authenticated.
       const userCredential = await signInWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
-      
-      console.log('✅ Firebase login successful:', userCredential.user.email);
-      
-      // Instead of relying on the auth state listener, manually sync here
-      try {
-        const syncResult = await syncFirebaseUserWithBackend(userCredential.user);
-        console.log('✅ Manual sync successful:', syncResult);
-        
-        handleSuccessfulLogin(syncResult.user);
-        // Navigation will be handled by useEffect when Redux state updates
-        
-      } catch (syncError) {
-        console.error('❌ Manual sync failed:', syncError);
-        // Firebase auth succeeded but backend sync failed
-        throw new Error('Login successful but account sync failed. Please try again.');
+
+      // Sync with our backend so we know the user's role, id, etc.
+      // (This is the single source of truth for post-Firebase-login sync —
+      // App.jsx's onAuthStateChanged listener will also fire and no-op if
+      // this already succeeded.)
+      const syncResult = await dispatch(syncFirebaseAuth(userCredential.user));
+
+      if (!syncResult?.payload?.success) {
+        throw new Error(
+          syncResult?.payload?.message || "We couldn't finish signing you in. Please try again."
+        );
       }
-      
+
+      toast({ title: "Logged in successfully!" });
+      // Navigation + cart merge handled by the useEffect above once Redux updates.
     } catch (firebaseError) {
-      console.error('❌ Firebase login error:', firebaseError);
-      
-      // If Firebase fails, try traditional backend login
+      const knownMessage = friendlyFirebaseError(firebaseError);
+
+      if (knownMessage) {
+        toast({ title: "Login failed", description: knownMessage, variant: "destructive" });
+        setIsLoading(false);
+        return;
+      }
+
+      // Firebase doesn't recognize this account (or errored unexpectedly) —
+      // fall back to a traditional local-password login.
       try {
-        console.log('🔄 Trying traditional backend login...');
         const response = await dispatch(loginUser({ formData }));
-        
+
         if (response?.payload?.success) {
-          handleSuccessfulLogin(response.payload.user);
-          // Navigation will be handled by useEffect
+          toast({ title: "Logged in successfully!" });
+          // Navigation + cart merge handled by the useEffect above.
         } else {
-          throw new Error(response?.payload?.message || 'Backend login failed');
+          toast({
+            title: "Login failed",
+            description: response?.payload?.message || "Please check your credentials and try again.",
+            variant: "destructive",
+          });
         }
       } catch (backendError) {
-        console.error('❌ Backend login error:', backendError);
-        
-        // Provide specific error messages
-        let errorMessage = "Login failed. Please check your credentials and try again.";
-        
-        if (firebaseError.code === 'auth/user-not-found') {
-          errorMessage = "No account found with this email. Please register first.";
-        } else if (firebaseError.code === 'auth/wrong-password') {
-          errorMessage = "Incorrect password. Please try again.";
-        } else if (firebaseError.code === 'auth/invalid-email') {
-          errorMessage = "Invalid email address format.";
-        } else if (firebaseError.code === 'auth/user-disabled') {
-          errorMessage = "This account has been disabled. Please contact support.";
-        } else if (firebaseError.code === 'auth/invalid-credential') {
-          errorMessage = "Invalid credentials. Please check your email and password.";
-        } else if (firebaseError.message) {
-          errorMessage = firebaseError.message;
-        }
-
         toast({
           title: "Login failed",
-          description: errorMessage,
+          description: "Please check your credentials and try again.",
           variant: "destructive",
         });
       }
@@ -188,37 +121,22 @@ function AuthLogin() {
   }
 
   // Handle Google/Social login success
-  const handleSocialLoginSuccess = async (userData) => {
-    console.log('🎉 Social login successful:', userData);
-    
-    // The AuthProviders component should handle the backend sync,
-    // but we can add a fallback here if needed
-    if (userData.user) {
-      handleSuccessfulLogin(userData.user, "Logged in successfully!");
-      // Navigation will be handled by useEffect when Redux state updates
-    } else {
-      console.error('❌ Social login userData missing user object');
-      toast({
-        title: "Login incomplete",
-        description: "Please try logging in again.",
-        variant: "destructive"
-      });
-    }
+  const handleSocialLoginSuccess = () => {
+    toast({ title: "Logged in successfully!" });
+    // Navigation + cart merge handled by the useEffect above.
   };
 
   // Handle social login error
   const handleSocialLoginError = (error) => {
-    console.error('❌ Social login error:', error);
     toast({
       title: "Authentication failed",
       description: error,
-      variant: "destructive"
+      variant: "destructive",
     });
   };
 
   // Don't render the form if already authenticated
   if (isAuthenticated && user) {
-    console.log('👤 User already authenticated, hiding login form');
     return null; // Let useEffect handle navigation
   }
 
@@ -238,10 +156,18 @@ function AuthLogin() {
           </Link>
         </p>
       </div>
-      
+
       <CommonForm
         formControls={loginFormControls}
-        buttonText={isLoading ? "Signing In..." : "Sign In"}
+        buttonText={
+          isLoading ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Signing In...
+            </span>
+          ) : (
+            "Sign In"
+          )
+        }
         formData={formData}
         setFormData={setFormData}
         onSubmit={onSubmit}
@@ -256,7 +182,7 @@ function AuthLogin() {
           Forgot your password?
         </Link>
       </div>
-      
+
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
           <span className="w-full border-t" />

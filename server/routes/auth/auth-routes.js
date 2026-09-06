@@ -24,13 +24,17 @@ const signToken = (user) =>
     { expiresIn: "7d" }
   );
 
-const setCookie = (res, token) =>
-  res.cookie("token", token, {
+const setCookie = (res, token) => {
+  const isProd = process.env.NODE_ENV === "production";
+  return res.cookie("token", token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "strict",
+    secure: isProd, // must be true whenever sameSite is "none"
+    sameSite: isProd ? "none" : "lax", // "none" lets the cookie survive a
+    // frontend/backend split across different domains — "strict" silently
+    // drops it on cross-site requests, which was breaking session persistence
     maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   });
+};
 
 // Firebase Admin Middleware with detailed logging
 const verifyFirebaseToken = async (req, res, next) => {

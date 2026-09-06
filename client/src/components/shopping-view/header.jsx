@@ -1,6 +1,6 @@
 /* eslint-disable no-unused-vars */
 // client/src/components/shopping-view/header.jsx
-import { HousePlug, LogOut, Menu, ShoppingCart, UserCog, Heart, HeartOff, Phone, MapPin, Clock, Truck, X } from "lucide-react";
+import { HousePlug, LogOut, Menu, ShoppingCart, UserCog, Heart, HeartOff, Phone, MapPin, Clock, Truck, X, LogIn, UserCircle2 } from "lucide-react";
 import logo from "../../assets/Kenya Magic Toy Shop Logo.png";
 import {
   Link,
@@ -71,7 +71,7 @@ function MenuItems() {
 
 function HeaderRightContent() {
   const { user, isAuthenticated } = useSelector((state) => state.auth);
-  const { cartItems } = useSelector((state) => state.shopCart);
+  const { cartItems, guestItems } = useSelector((state) => state.shopCart);
   const wishlistItems = useSelector((state) => state.shopWishlist.items || []);
   const [openCartSheet, setOpenCartSheet] = useState(false);
   const [openWishlistSheet, setOpenWishlistSheet] = useState(false);
@@ -95,14 +95,6 @@ function HeaderRightContent() {
   }, [dispatch, isAuthenticated, user?.id]);
 
   const handleCartClick = () => {
-    if (!isAuthenticated) {
-      toast({
-        title: "Please login to view cart",
-        description: "You'll be redirected to the login page.",
-      });
-      setTimeout(() => navigate("/auth/login"), 1500);
-      return;
-    }
     setOpenCartSheet(true);
   };
 
@@ -145,20 +137,20 @@ function HeaderRightContent() {
           className="relative p-2 hover:bg-gray-50 rounded-lg transition-all duration-300 group"
         >
           <ShoppingCart className="w-5 h-5 text-gray-700 group-hover:text-amber-600 transition-colors duration-300" />
-          {isAuthenticated && (
+          {(isAuthenticated ? cartItems?.items?.length : guestItems?.length) > 0 && (
             <span className="absolute -top-1 -right-1 w-5 h-5 bg-amber-500 text-white text-xs font-light rounded-full flex items-center justify-center">
-              {cartItems?.items?.length || 0}
+              {isAuthenticated ? cartItems?.items?.length : guestItems?.length}
             </span>
           )}
         </button>
-        {isAuthenticated && (
-          <UserCartWrapper
-            setOpenCartSheet={setOpenCartSheet}
-            cartItems={
-              cartItems?.items?.length > 0 ? cartItems.items : []
-            }
-          />
-        )}
+        <UserCartWrapper
+          setOpenCartSheet={setOpenCartSheet}
+          cartItems={
+            isAuthenticated
+              ? (cartItems?.items?.length > 0 ? cartItems.items : [])
+              : guestItems || []
+          }
+        />
       </Sheet>
 
       {/* Account or Login */}
@@ -204,6 +196,34 @@ function HeaderRightContent() {
         </Button>
       )}
     </div>
+  );
+}
+
+function MobileAuthButton() {
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
+  const navigate = useNavigate();
+
+  if (isAuthenticated && user) {
+    return (
+      <button
+        onClick={() => navigate(user.role === "admin" ? "/admin/dashboard" : "/shop/account")}
+        className="lg:hidden flex items-center justify-center w-9 h-9 rounded-full bg-amber-50 text-amber-700 hover:bg-amber-100 transition-colors"
+        aria-label="My account"
+      >
+        <UserCircle2 className="w-5 h-5" />
+      </button>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => navigate("/auth/login")}
+      className="lg:hidden flex items-center gap-1.5 px-3 h-9 rounded-full bg-amber-500 text-white text-sm font-medium hover:bg-amber-600 transition-colors shadow-sm"
+      aria-label="Sign in"
+    >
+      <LogIn className="w-4 h-4" />
+      Sign In
+    </button>
   );
 }
 
@@ -265,6 +285,9 @@ function ShoppingHeader() {
             <div className="hidden lg:block">
               <HeaderRightContent />
             </div>
+
+            {/* Always-visible mobile sign-in / account shortcut */}
+            <MobileAuthButton />
 
             {/* Mobile menu button */}
             <button

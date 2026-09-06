@@ -40,6 +40,7 @@ import ProductDetailsDialog from "@/components/shopping-view/product-details";
 import { getFeatureImages } from "@/store/common-slice";
 import { fetchWishlist } from "@/store/shop/wishlist-slice";
 import TermsAndConditionsSheet from "@/components/shopping-view/terms-conditions-sheet";
+import { useAddToCart } from "@/hooks/use-add-to-cart";
 
 const categoriesWithIcon = [
   { id: "home", label: "Home", icon: HomeIcon },
@@ -65,6 +66,7 @@ function ShoppingHome() {
 
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const addItemToCart = useAddToCart();
   const { toast } = useToast();
 
   function handleNavigateToListingPage(getCurrentItem, section) {
@@ -80,29 +82,8 @@ function ShoppingHome() {
     dispatch(fetchProductDetails(getCurrentProductId));
   }
 
-  function handleAddtoCart(getCurrentProductId) {
-    if (!isAuthenticated || !user) {
-      toast({
-        title: "Please login to add items to cart.",
-        description: "You'll be redirected to the login page.",
-        variant: "default",
-      });
-      setTimeout(() => navigate("/auth/login"), 1500);
-      return;
-    }
-
-    dispatch(
-      addToCart({
-        userId: user?.id,
-        productId: getCurrentProductId,
-        quantity: 1,
-      })
-    ).then((data) => {
-      if (data?.payload?.success) {
-        dispatch(fetchCartItems(user?.id));
-        toast({ title: "Product is added to cart" });
-      }
-    });
+  function handleAddtoCart(getCurrentProductId, getTotalStock, productOverride) {
+    addItemToCart(getCurrentProductId, 1, productOverride);
   }
 
   useEffect(() => {

@@ -15,6 +15,7 @@ import { Label } from "../ui/label";
 import StarRatingComponent from "../common/star-rating";
 import { useEffect, useState } from "react";
 import { addReview, getReviews } from "@/store/shop/review-slice";
+import { useAddToCart } from "@/hooks/use-add-to-cart";
 
 function ProductDetailsDialog({ open, setOpen, productDetails }) {
   const [reviewMsg, setReviewMsg] = useState("");
@@ -31,6 +32,7 @@ function ProductDetailsDialog({ open, setOpen, productDetails }) {
   const { cartItems } = useSelector((state) => state.shopCart);
   const { reviews } = useSelector((state) => state.shopReview);
   const { toast } = useToast();
+  const addItemToCart = useAddToCart();
 
   // Get all product images
   const productImages = productDetails?.images && productDetails.images.length > 0
@@ -140,36 +142,7 @@ function ProductDetailsDialog({ open, setOpen, productDetails }) {
   }
 
   function handleAddToCart(productId, totalStock) {
-    let getCartItems = cartItems.items || [];
-
-    if (getCartItems.length) {
-      const indexOfCurrentItem = getCartItems.findIndex(
-        (item) => item.productId === productId
-      );
-      if (indexOfCurrentItem > -1) {
-        const getQuantity = getCartItems[indexOfCurrentItem].quantity;
-        if (getQuantity + 1 > totalStock) {
-          toast({
-            title: `Only ${getQuantity} quantity can be added for this item`,
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-    }
-
-    dispatch(
-      addToCart({
-        userId: user?.id,
-        productId,
-        quantity: 1,
-      })
-    ).then((data) => {
-      if (data?.payload?.success) {
-        dispatch(fetchCartItems(user?.id));
-        toast({ title: "Product is added to cart" });
-      }
-    });
+    addItemToCart(productId, 1, productDetails);
   }
 
   function handleWishlistToggle() {

@@ -108,17 +108,7 @@ function ShoppingProductTile({
 
   const handleAddToCartClick = (e) => {
     e.stopPropagation();
-    if (!isAuthenticated || !user) {
-      toast({
-        title: "Please login to add items to cart.",
-        description: "You'll be redirected to the login page.",
-        variant: "default",
-      });
-      setTimeout(() => navigate("/auth/login"), 1500);
-      return;
-    }
-    
-    handleAddtoCart(product?._id, product?.totalStock);
+    handleAddtoCart(product?._id, product?.totalStock, product);
   };
 
   return (

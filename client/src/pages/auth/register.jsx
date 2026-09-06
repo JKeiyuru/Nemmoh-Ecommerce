@@ -3,11 +3,14 @@
 import CommonForm from "@/components/common/form";
 import { useToast } from "@/components/ui/use-toast";
 import { registerFormControls } from "@/config";
+import { registerFirebaseUser } from "@/store/auth-slice";
 import { useState } from "react";
+import { useDispatch } from "react-redux";
 import { Link } from "react-router-dom";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "@/firebase";
 import { AuthProviders } from "@/components/auth/auth-providers";
+import { Loader2 } from "lucide-react";
 
 const initialState = {
   userName: "",
@@ -18,57 +21,61 @@ const initialState = {
 function AuthRegister() {
   const [formData, setFormData] = useState(initialState);
   const [isLoading, setIsLoading] = useState(false);
+  const dispatch = useDispatch();
   const { toast } = useToast();
 
   async function onSubmit(event) {
     event.preventDefault();
     setIsLoading(true);
 
+    let firebaseUserForCleanup = null;
+
     try {
-      // First, try to create Firebase user
+      // First, create the Firebase user
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         formData.email,
         formData.password
       );
+      firebaseUserForCleanup = userCredential.user;
 
-      // Get Firebase ID token
       const idToken = await userCredential.user.getIdToken();
 
-      // Register with backend using Firebase token
-      const response = await fetch('/api/auth/firebase-register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${idToken}`
-        },
-        body: JSON.stringify({
+      const response = await dispatch(
+        registerFirebaseUser({
           userName: formData.userName,
           email: formData.email,
-          firebaseUid: userCredential.user.uid
+          firebaseUid: userCredential.user.uid,
+          idToken,
         })
-      });
+      );
 
-      const data = await response.json();
-
-      if (data.success) {
+      if (response?.payload?.success) {
         toast({
           title: "Account created successfully!",
-          description: "You will be redirected shortly."
+          description: "You will be redirected shortly.",
         });
-        // Don't manually navigate - let the auth state change handle it
-        // The Firebase auth state listener in App.jsx will handle the redirect
+        // Don't manually navigate — the auth state listener in App.jsx
+        // (and CheckAuth watching Redux) will handle the redirect.
       } else {
-        // If backend registration fails, delete the Firebase user
-        await userCredential.user.delete();
-        throw new Error(data.message || 'Registration failed');
+        // Backend registration failed — clean up the orphaned Firebase user.
+        await firebaseUserForCleanup.delete().catch(() => {});
+        throw new Error(response?.payload?.message || "Registration failed");
+      }
+    } catch (error) {
+      let description = error.message || "An unexpected error occurred";
+
+      if (error.code === "auth/email-already-in-use") {
+        description = "An account with this email already exists. Try logging in instead.";
+      } else if (error.code === "auth/weak-password") {
+        description = "Please choose a stronger password (at least 6 characters).";
+      } else if (error.code === "auth/invalid-email") {
+        description = "That doesn't look like a valid email address.";
       }
 
-    } catch (error) {
-      console.error('Registration error:', error);
       toast({
         title: "Registration failed",
-        description: error.message || "An unexpected error occurred",
+        description,
         variant: "destructive",
       });
     } finally {
@@ -94,7 +101,15 @@ function AuthRegister() {
       </div>
       <CommonForm
         formControls={registerFormControls}
-        buttonText={isLoading ? "Creating Account..." : "Sign Up"}
+        buttonText={
+          isLoading ? (
+            <span className="inline-flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Creating Account...
+            </span>
+          ) : (
+            "Sign Up"
+          )
+        }
         formData={formData}
         setFormData={setFormData}
         onSubmit={onSubmit}
@@ -112,12 +127,11 @@ function AuthRegister() {
       </div>
 
       <AuthProviders 
-        onSuccess={(userData) => {
+        onSuccess={() => {
           toast({ 
             title: "Account created successfully!",
             description: "You will be redirected shortly."
           });
-          // Don't manually navigate - let the auth state change handle it
         }}
         onError={(error) => {
           toast({

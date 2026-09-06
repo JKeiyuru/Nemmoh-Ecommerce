@@ -24,28 +24,20 @@ export function AuthProviders({ onSuccess, onError }) {
       });
 
       const result = await signInWithPopup(auth, googleProvider);
-      console.log('✅ Google sign-in successful:', result.user.email);
-      
-      // Firebase auth state change will trigger sync in App.jsx
-      // But let's also manually sync to ensure it happens
-      console.log('🔄 Manually syncing Firebase auth...');
+
       const syncResult = await dispatch(syncFirebaseAuth(result.user));
-      
+
       if (syncResult.payload?.success) {
-        console.log('✅ Google login sync successful');
         onSuccess(syncResult.payload);
       } else {
-        console.log('⚠️ Google login sync incomplete, but Firebase auth succeeded');
-        // Still call onSuccess because Firebase auth worked
-        onSuccess({
-          user: {
-            email: result.user.email,
-            name: result.user.displayName,
-            role: 'pending...'
-          }
-        });
+        // Firebase auth succeeded but our backend couldn't confirm the
+        // account — don't fake a success state, since that leaves the app
+        // thinking the user is signed in when Redux says otherwise.
+        onError(
+          syncResult.payload?.message ||
+            "We signed you in with Google, but couldn't finish setting up your account. Please try again."
+        );
       }
-      
     } catch (error) {
       console.error('❌ Google sign-in error:', error);
       

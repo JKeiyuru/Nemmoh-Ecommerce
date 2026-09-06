@@ -30,6 +30,28 @@ export const registerUser = createAsyncThunk(
   }
 );
 
+// Complete registration on the backend for a Firebase account that was just
+// created client-side (createUserWithEmailAndPassword). Uses the Firebase ID
+// token for auth, not a cookie — safe to call before any session exists.
+export const registerFirebaseUser = createAsyncThunk(
+  "auth/registerFirebaseUser",
+  async ({ userName, email, firebaseUid, idToken }, { rejectWithValue }) => {
+    try {
+      const response = await axios.post(
+        `${API_BASE_URL}/api/auth/firebase-register`,
+        { userName, email, firebaseUid },
+        {
+          withCredentials: true,
+          headers: { Authorization: `Bearer ${idToken}` },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      return rejectWithValue(error.response?.data || error.message);
+    }
+  }
+);
+
 // Login with Firebase + Backend
 export const loginUser = createAsyncThunk(
   "auth/login",
@@ -208,6 +230,22 @@ const authSlice = createSlice({
         state.isLoading = false;
       })
       .addCase(registerUser.rejected, (state) => {
+        state.isLoading = false;
+      })
+
+      // Register (Firebase)
+      .addCase(registerFirebaseUser.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(registerFirebaseUser.fulfilled, (state, action) => {
+        state.isLoading = false;
+        if (action.payload?.success && action.payload?.user) {
+          state.user = action.payload.user;
+          state.isAuthenticated = true;
+        }
+        state.authChecked = true;
+      })
+      .addCase(registerFirebaseUser.rejected, (state) => {
         state.isLoading = false;
       })
       

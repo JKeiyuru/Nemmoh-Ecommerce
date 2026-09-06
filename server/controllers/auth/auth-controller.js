@@ -16,11 +16,14 @@ const signToken = (user) =>
 
 const setCookieAndRespond = (res, user, statusCode = 200, extraData = {}) => {
   const token = signToken(user);
+  const isProd = process.env.NODE_ENV === "production";
   res
     .cookie("token", token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "strict",
+      secure: isProd, // must be true whenever sameSite is "none"
+      sameSite: isProd ? "none" : "lax", // "none" lets the cookie survive a
+      // frontend/backend split across different domains (e.g. a custom
+      // domain frontend + a Render-hosted API) — "strict" silently drops it
       maxAge: 7 * 24 * 60 * 60 * 1000,
     })
     .status(statusCode)
@@ -247,10 +250,17 @@ const resetPassword = async (req, res) => {
 
 // Logout
 const logoutUser = (req, res) => {
-  res.clearCookie("token").json({
-    success: true,
-    message: "Logged out successfully",
-  });
+  const isProd = process.env.NODE_ENV === "production";
+  res
+    .clearCookie("token", {
+      httpOnly: true,
+      secure: isProd,
+      sameSite: isProd ? "none" : "lax",
+    })
+    .json({
+      success: true,
+      message: "Logged out successfully",
+    });
 };
 
 // Enhanced Auth Middleware

@@ -18,7 +18,7 @@ function MobileBottomNav() {
   const dispatch = useDispatch();
   const { toast } = useToast();
   const { user, isAuthenticated } = useSelector((state) => state.auth);
-  const { cartItems } = useSelector((state) => state.shopCart);
+  const { cartItems, guestItems } = useSelector((state) => state.shopCart);
   const wishlistItems = useSelector((state) => state.shopWishlist.items || []);
 
   const [openCartSheet, setOpenCartSheet] = useState(false);
@@ -30,7 +30,7 @@ function MobileBottomNav() {
     }
   }, [dispatch, isAuthenticated, user?.id]);
 
-  const cartCount = cartItems?.items?.length || 0;
+  const cartCount = isAuthenticated ? (cartItems?.items?.length || 0) : (guestItems?.length || 0);
   const wishlistCount = isAuthenticated ? wishlistItems.length : 0;
 
   const isActive = (path) => location.pathname === path;
@@ -63,7 +63,7 @@ function MobileBottomNav() {
       key: "cart",
       label: "Cart",
       icon: ShoppingCart,
-      onClick: () => requireAuth(() => setOpenCartSheet(true)),
+      onClick: () => setOpenCartSheet(true),
       active: false,
       badge: cartCount,
     },
@@ -121,12 +121,14 @@ function MobileBottomNav() {
 
       {/* Cart sheet, triggered from the bottom nav */}
       <Sheet open={openCartSheet} onOpenChange={setOpenCartSheet}>
-        {isAuthenticated && (
-          <UserCartWrapper
-            setOpenCartSheet={setOpenCartSheet}
-            cartItems={cartItems?.items?.length > 0 ? cartItems.items : []}
-          />
-        )}
+        <UserCartWrapper
+          setOpenCartSheet={setOpenCartSheet}
+          cartItems={
+            isAuthenticated
+              ? (cartItems?.items?.length > 0 ? cartItems.items : [])
+              : guestItems || []
+          }
+        />
       </Sheet>
 
       {/* Wishlist sheet, triggered from the bottom nav */}
